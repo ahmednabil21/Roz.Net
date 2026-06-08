@@ -43,3 +43,10 @@ REACT_APP_API_URL=https://api-solid.execute-iq.com/wakeel/api
 | `VERCEL_PROJECT_ID` | نفس الصفحة → **Project ID** |
 
 بعد إضافة الأسرار، أي `git push` على `main` ينشر تلقائياً إلى مشروع **solid-system**.
+
+### إعداد Vercel (ربط Git مباشر)
+
+عند ربط `ahmednabil21/Solid-Sys` في Vercel:
+
+- **Root Directory:** اتركه فارغاً (`.`) — ملف `vercel.json` في الجذر يوجّه البناء إلى `wakeelfrontend/`
+- **Environment Variable:** `REACT_APP_API_URL` = `https://api-solid.execute-iq.com/wakeel/api`
