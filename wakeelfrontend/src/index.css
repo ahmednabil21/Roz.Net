@@ -5,6 +5,7 @@
 
 /* Safe area for notched phones (iPhone X+, etc.) */
 :root {
+  --ui-scale: 0.8;
   --sat: env(safe-area-inset-top);
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
@@ -18,6 +19,16 @@
     letter-spacing: -0.01em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    zoom: var(--ui-scale);
+  }
+
+  @supports not (zoom: 1) {
+    html {
+      transform: scale(var(--ui-scale));
+      transform-origin: top right;
+      width: calc(100% / var(--ui-scale));
+      min-height: calc(100vh / var(--ui-scale));
+    }
   }
 
   body {
