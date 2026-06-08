@@ -37,10 +37,6 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,20 +48,17 @@ jobs:
           cache: npm
           cache-dependency-path: wakeelfrontend/package-lock.json
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Build (Create React App)
+        run: npm run build
         env:
           CI: true
           REACT_APP_API_URL: https://api-solid.execute-iq.com/wakeel/api
 
-      - name: Deploy to production
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Deploy build folder to Vercel
+        run: vercel deploy ./build --prod --yes --token="$VERCEL_TOKEN"
