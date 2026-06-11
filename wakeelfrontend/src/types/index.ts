@@ -808,6 +808,25 @@ export interface AgentRegionUpdateRequest {
   displayOrder?: number;
 }
 
+/** أجور الخدمة — GET/POST/PUT/DELETE /ServiceFees */
+export interface ServiceFees {
+  id: string;
+  agentId: string;
+  name: string;
+  price: number;
+}
+
+export interface ServiceFeesCreateRequest {
+  name: string;
+  price: number;
+  agentId?: string;
+}
+
+export interface ServiceFeesUpdateRequest {
+  name: string;
+  price: number;
+}
+
 /** رسيلر وكيل (SAS / FTTH / Earthlink) — من GET/POST/PUT /Agents/me/resellers */
 export interface AgentReseller {
   id: string;

@@ -124,6 +124,9 @@ import {
   AgentRegion,
   AgentRegionCreateRequest,
   AgentRegionUpdateRequest,
+  ServiceFees,
+  ServiceFeesCreateRequest,
+  ServiceFeesUpdateRequest,
   ResellerWhatsAppSessionRequest,
   MainAgentDashboardDto,
   AgentRegistrationRequest,
@@ -705,6 +708,32 @@ class ApiService {
     await this.api.delete(`/Agents/me/regions/${id}`);
   }
 
+  /** قائمة أجور الخدمة — GET /ServiceFees */
+  async getServiceFees(agentId?: string): Promise<ServiceFees[]> {
+    const response = await this.api.get<ServiceFees[]>('/ServiceFees', {
+      params: agentId ? { agentId } : undefined,
+    });
+    return response.data ?? [];
+  }
+
+  async getServiceFee(id: string): Promise<ServiceFees> {
+    const response = await this.api.get<ServiceFees>(`/ServiceFees/${id}`);
+    return response.data;
+  }
+
+  async createServiceFee(data: ServiceFeesCreateRequest): Promise<ServiceFees> {
+    const response = await this.api.post<ServiceFees>('/ServiceFees', data);
+    return response.data;
+  }
+
+  async updateServiceFee(id: string, data: ServiceFeesUpdateRequest): Promise<ServiceFees> {
+    const response = await this.api.put<ServiceFees>(`/ServiceFees/${id}`, data);
+    return response.data;
+  }
+
+  async deleteServiceFee(id: string): Promise<void> {
+    await this.api.delete(`/ServiceFees/${id}`);
+  }
 
   /** قائمة رسيلرز وكيل معيّن — GET /Agents/{agentId}/resellers. استخدم "me" للوكيل الحالي. للأدمن: agentId الوكيل المختار. */
   async getAgentResellers(agentId: string): Promise<AgentReseller[]> {

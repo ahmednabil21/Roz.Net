@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useDigits } from '../contexts/DigitsContext';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import {
   getActivationMessageSettings,
@@ -32,6 +33,9 @@ import {
   AgentRegion,
   AgentRegionCreateRequest,
   AgentRegionUpdateRequest,
+  ServiceFees,
+  ServiceFeesCreateRequest,
+  ServiceFeesUpdateRequest,
   FtthSubscribersExportBody,
   SasSubscribersExportBody,
   WhatsAppDeviceStatusAdmin,
@@ -63,6 +67,7 @@ import {
   Sparkles,
   Search,
   Activity,
+  DollarSign,
 } from 'lucide-react';
 
 /** نقاط تُعرض أثناء استيراد المشتركين — ألوان ومزايا النظام */
@@ -85,6 +90,7 @@ const SAS_SYNC_STEPS = [
 function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const { formatNumber } = useDigits();
   const queryClient = useQueryClient();
   const [showCredentialsNewPassword, setShowCredentialsNewPassword] = useState(false);
   const [credentialsCurrentPassword, setCredentialsCurrentPassword] = useState('');
@@ -113,6 +119,8 @@ function SettingsPage() {
   /** الوكيل والمدير الثانوي والموظف: جلب الوكيل (للموظف/المدير الثانوي يرجع الوكيل التابع له — نفس جلسة واتساب) */
   const isAgentOrSubAgentOrEmployee = isAgentOrSubAgent || isEmployee;
   const isAdmin = user?.role === UserRole.Admin;
+  const canManageServiceFees = isAdmin || isAgentOrSubAgent;
+  const canViewServiceFees = canManageServiceFees || isEmployee;
 
   // Admin SAS browser-sync state
   const [sasBrowserToken, setSasBrowserToken] = useState('');
@@ -448,6 +456,7 @@ function SettingsPage() {
     | 'details'
     | 'customMessage'
     | 'resellers'
+    | 'serviceFees'
     | 'sas'
     | 'whatsapp'
     | 'sasAdminBrowserSync'
@@ -1068,6 +1077,97 @@ function SettingsPage() {
     }
   };
   const serviceTypeLabel = (st: ServiceType) => (st === ServiceType.Ftth ? 'FTTH' : st === ServiceType.Sas ? 'SAS' : 'Earthlink');
+
+  const [serviceFeesAgentId, setServiceFeesAgentId] = useState('');
+  const [serviceFeeFormId, setServiceFeeFormId] = useState<string | null>(null);
+  const [showServiceFeeForm, setShowServiceFeeForm] = useState(false);
+  const [serviceFeeName, setServiceFeeName] = useState('');
+  const [serviceFeePrice, setServiceFeePrice] = useState('');
+
+  const { data: serviceFeesAgentsData } = useQuery({
+    queryKey: ['agents-list-service-fees'],
+    queryFn: () => apiService.getAllAgents({ page: 1, pageSize: 500 }),
+    enabled: isAdmin && activeSection === 'serviceFees',
+  });
+  const serviceFeesAgents = serviceFeesAgentsData?.data ?? [];
+
+  const { data: serviceFeesList = [], isLoading: serviceFeesLoading } = useQuery<ServiceFees[]>({
+    queryKey: ['serviceFees', isAdmin ? serviceFeesAgentId : 'me'],
+    queryFn: () => apiService.getServiceFees(isAdmin ? serviceFeesAgentId || undefined : undefined),
+    enabled: canViewServiceFees && activeSection === 'serviceFees' && (!isAdmin || !!serviceFeesAgentId),
+  });
+
+  const createServiceFeeMutation = useMutation({
+    mutationFn: (data: ServiceFeesCreateRequest) => apiService.createServiceFee(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceFees'] });
+      showSuccess('تم الحفظ', 'تمت إضافة أجور الخدمة بنجاح.');
+      setServiceFeeFormId(null);
+      setShowServiceFeeForm(false);
+      setServiceFeeName('');
+      setServiceFeePrice('');
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+
+  const updateServiceFeeMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ServiceFeesUpdateRequest }) =>
+      apiService.updateServiceFee(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceFees'] });
+      showSuccess('تم الحفظ', 'تم تحديث أجور الخدمة بنجاح.');
+      setServiceFeeFormId(null);
+      setShowServiceFeeForm(false);
+      setServiceFeeName('');
+      setServiceFeePrice('');
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+
+  const deleteServiceFeeMutation = useMutation({
+    mutationFn: (id: string) => apiService.deleteServiceFee(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['serviceFees'] });
+      showSuccess('تم الحذف', 'تم حذف أجور الخدمة بنجاح.');
+      if (serviceFeeFormId) setServiceFeeFormId(null);
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+
+  const handleOpenServiceFeeEdit = (fee: ServiceFees) => {
+    setServiceFeeFormId(fee.id);
+    setShowServiceFeeForm(true);
+    setServiceFeeName(fee.name);
+    setServiceFeePrice(String(fee.price));
+  };
+
+  const handleSaveServiceFee = () => {
+    if (!serviceFeeName.trim()) {
+      showError('خطأ', 'اسم الخدمة مطلوب.');
+      return;
+    }
+    const price = Number(serviceFeePrice);
+    if (!Number.isFinite(price) || price < 0) {
+      showError('خطأ', 'أدخل سعراً صحيحاً (0 أو أكثر).');
+      return;
+    }
+    if (serviceFeeFormId) {
+      updateServiceFeeMutation.mutate({
+        id: serviceFeeFormId,
+        data: { name: serviceFeeName.trim(), price },
+      });
+    } else {
+      if (isAdmin && !serviceFeesAgentId.trim()) {
+        showError('خطأ', 'اختر الوكيل أولاً.');
+        return;
+      }
+      createServiceFeeMutation.mutate({
+        name: serviceFeeName.trim(),
+        price,
+        agentId: isAdmin ? serviceFeesAgentId.trim() : undefined,
+      });
+    }
+  };
 
   const [customMessageTemplate, setCustomMessageTemplate] = useState('');
   const { data: customMessageData } = useQuery({
@@ -3005,6 +3105,165 @@ function SettingsPage() {
             </div>
           )}
 
+          {/* أجور الخدمة */}
+          {canViewServiceFees && activeSection === 'serviceFees' && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex items-center space-x-3">
+                  <DollarSign className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">أجور الخدمة</h2>
+                </div>
+                {canManageServiceFees && (!isAdmin || !!serviceFeesAgentId) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setServiceFeeFormId(null);
+                      setShowServiceFeeForm(true);
+                      setServiceFeeName('');
+                      setServiceFeePrice('');
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    إضافة خدمة
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                إدارة أسماء الخدمات وأسعارها المرتبطة بالوكيل. لا يُسمح بتكرار اسم الخدمة لنفس الوكيل.
+              </p>
+
+              {isAdmin && (
+                <div className="mb-4 max-w-md">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الوكيل *</label>
+                  <select
+                    value={serviceFeesAgentId}
+                    onChange={(e) => {
+                      setServiceFeesAgentId(e.target.value);
+                      setServiceFeeFormId(null);
+                      setShowServiceFeeForm(false);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                  >
+                    <option value="">— اختر الوكيل —</option>
+                    {serviceFeesAgents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.companyName || agent.fullName || agent.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isAdmin && !serviceFeesAgentId ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">اختر وكيلاً لعرض وإدارة أجور الخدمة.</p>
+              ) : serviceFeesLoading ? (
+                <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل أجور الخدمة...</div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="wakeel-table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>اسم الخدمة</th>
+                          <th>السعر</th>
+                          {canManageServiceFees && <th className="w-28">إجراءات</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {serviceFeesList.map((fee) => (
+                          <tr key={fee.id}>
+                            <td className="font-medium text-gray-900 dark:text-white">{fee.name}</td>
+                            <td className="tabular-nums">{formatNumber(fee.price, { suffix: ' د.ع' })}</td>
+                            {canManageServiceFees && (
+                              <td>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenServiceFeeEdit(fee)}
+                                    className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                                    title="تعديل"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => window.confirm('حذف هذه الخدمة؟') && deleteServiceFeeMutation.mutate(fee.id)}
+                                    className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                    title="حذف"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {serviceFeesList.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {canManageServiceFees ? 'لم تُضف أي خدمة بعد. اضغط «إضافة خدمة».' : 'لا توجد أجور خدمة مسجّلة.'}
+                    </p>
+                  )}
+
+                  {canManageServiceFees && showServiceFeeForm && (
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        {serviceFeeFormId ? 'تعديل الخدمة' : 'إضافة خدمة'}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">اسم الخدمة *</label>
+                          <input
+                            type="text"
+                            value={serviceFeeName}
+                            onChange={(e) => setServiceFeeName(e.target.value)}
+                            placeholder="مثل: صيانة، تركيب"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">السعر (د.ع) *</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={serviceFeePrice}
+                            onChange={(e) => setServiceFeePrice(e.target.value)}
+                            placeholder="0"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={handleSaveServiceFee}
+                          disabled={createServiceFeeMutation.isPending || updateServiceFeeMutation.isPending}
+                          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm disabled:opacity-50"
+                        >
+                          {serviceFeeFormId ? 'حفظ التعديل' : 'إضافة'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setServiceFeeFormId(null);
+                            setShowServiceFeeForm(false);
+                          }}
+                          className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white rounded-lg text-sm"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ربط جلسة واتساب — الوكيل/المدير الثانوي يعدّلون؛ الموظف يرى جلسة الوكيل (نفس الجلسة للموظف والمدير الثانوي) */}
           {isAgentOrSubAgentOrEmployee && activeSection === 'whatsapp' && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -3465,6 +3724,18 @@ function SettingsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveSection('serviceFees')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'serviceFees'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <DollarSign className="h-5 w-5 flex-shrink-0" />
+                    <span>أجور الخدمة</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setActiveSection('whatsapp')}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
                       activeSection === 'whatsapp'
@@ -3478,17 +3749,45 @@ function SettingsPage() {
                 </>
               )}
               {isEmployee && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection('serviceFees')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'serviceFees'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <DollarSign className="h-5 w-5 flex-shrink-0" />
+                    <span>أجور الخدمة</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection('whatsapp')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'whatsapp'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <MessageCircle className="h-5 w-5 flex-shrink-0" />
+                    <span>ربط واتساب</span>
+                  </button>
+                </>
+              )}
+              {isAdmin && (
                 <button
                   type="button"
-                  onClick={() => setActiveSection('whatsapp')}
+                  onClick={() => setActiveSection('serviceFees')}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
-                    activeSection === 'whatsapp'
+                    activeSection === 'serviceFees'
                       ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                 >
-                  <MessageCircle className="h-5 w-5 flex-shrink-0" />
-                  <span>ربط واتساب</span>
+                  <DollarSign className="h-5 w-5 flex-shrink-0" />
+                  <span>أجور الخدمة</span>
                 </button>
               )}
             </nav>
