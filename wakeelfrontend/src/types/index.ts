@@ -1526,8 +1526,10 @@ export interface Subscriber {
   regionId?: string | null;
   regionName?: string | null;
   totalDebt?: number;
-  /** الكابينة (اختياري، حد أقصى 200 حرف) */
+  /** رقم البناية (اختياري، حد أقصى 200 حرف) — الحقل API: fat */
   fat?: string | null;
+  /** رقم الشقة (اختياري) */
+  apartmentNumber?: string | null;
   /** المنطقة (اختياري، حد أقصى 200 حرف) */
   zone?: string | null;
   /** صيانات مكتملة مرتبطة بالمشترك (من مهام الموظفين)، من الأحدث للأقدم */
@@ -1552,8 +1554,10 @@ export interface SubscriberCreateRequest {
   activationDate: string;
   expirationDate: string;
   subscriptionType: SubscriptionType;
-  /** الكابينة (اختياري، حد أقصى 200 حرف) */
+  /** رقم البناية (اختياري) — الحقل API: fat */
   fat?: string;
+  /** رقم الشقة (اختياري) */
+  apartmentNumber?: string;
   /** المنطقة (اختياري، حد أقصى 200 حرف) */
   zone?: string;
   /** الرسيلر/المنطقة الحالية للمشترك */
@@ -1577,6 +1581,7 @@ export interface SubscriberUpdateRequest {
   expirationDate: string;
   subscriptionType?: SubscriptionType;
   fat?: string;
+  apartmentNumber?: string;
   zone?: string;
 }
 
@@ -2124,10 +2129,16 @@ export interface PaginationParams {
   sortDescending?: boolean;
   /** المشتركون الذين سينتهي اشتراكهم خلال 0..N يوم (يشمل المنتهي، 0 يوم) */
   maxDaysUntilExpiry?: number;
-  /** فلترة بالمطابقة الجزئية على الكابينة (Fat) */
+  /** فلترة بالمطابقة الجزئية على رقم البناية (fat) */
   fat?: string;
+  /** فلترة بالمطابقة الجزئية على رقم الشقة */
+  apartmentNumber?: string;
   /** فلترة بالمطابقة الجزئية على الزون */
   zone?: string;
+  /** فلترة بباقة واحدة */
+  profileId?: string;
+  /** فلترة بعدة باقات — يُفضَّل على profileId عند وجوده */
+  profileIds?: string[];
   /** فلترة حسب نوع الملاحظة (SubscriberNoteType) */
   noteType?: SubscriberNoteType;
   /** تاريخ انتهاء الاشتراك من — المشتركون الذين انتهاؤهم ≥ هذا التاريخ (yyyy-MM-dd) */

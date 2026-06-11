@@ -54,7 +54,8 @@ const SUBSCRIBERS_TABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'subscriberRegion', label: 'منطقة المشترك' },
   { id: 'phoneNumber', label: 'رقم الهاتف' },
   { id: 'agentCompanyName', label: 'شركة الوكيل' },
-  { id: 'fat', label: 'الكابينة' },
+  { id: 'fat', label: 'رقم البناية' },
+  { id: 'apartmentNumber', label: 'رقم الشقة' },
   { id: 'zone', label: 'المنطقة' },
   { id: 'noteType', label: 'نوع الملاحظة' },
   { id: 'note', label: 'الملاحظات' },
@@ -213,9 +214,13 @@ const SubscribersPage: React.FC = () => {
   const [maxDaysUntilExpiry, setMaxDaysUntilExpiry] = useState<string>('');
   const [appliedMaxDaysUntilExpiry, setAppliedMaxDaysUntilExpiry] = useState<string>('');
   const [fatFilter, setFatFilter] = useState<string>('');
+  const [apartmentNumberFilter, setApartmentNumberFilter] = useState<string>('');
   const [zoneFilter, setZoneFilter] = useState<string>('');
+  const [profileIdsFilter, setProfileIdsFilter] = useState<string[]>([]);
   const [appliedFatFilter, setAppliedFatFilter] = useState<string>('');
+  const [appliedApartmentNumberFilter, setAppliedApartmentNumberFilter] = useState<string>('');
   const [appliedZoneFilter, setAppliedZoneFilter] = useState<string>('');
+  const [appliedProfileIdsFilter, setAppliedProfileIdsFilter] = useState<string[]>([]);
   const [noteTypeFilter, setNoteTypeFilter] = useState<string>('all');
   const [appliedNoteTypeFilter, setAppliedNoteTypeFilter] = useState<string>('all');
   const [extensionActivationFilter, setExtensionActivationFilter] = useState<boolean>(false);
@@ -327,6 +332,7 @@ const SubscribersPage: React.FC = () => {
     expirationDate: new Date().toISOString().split('T')[0],
     subscriptionType: SubscriptionType.Paid,
     fat: '',
+    apartmentNumber: '',
     zone: '',
     agentResellerId: ''
   });
@@ -352,7 +358,7 @@ const SubscribersPage: React.FC = () => {
   const [pageSize] = useState(10);
 
   const { data: subscribersResponse, error, isLoading } = useQuery<PaginatedResponse<Subscriber>>({
-    queryKey: ['subscribers', 'offline', online, currentPage, pageSize, debouncedSearchTerm, statusFilter, sortDescending, appliedMaxDaysUntilExpiry, appliedFatFilter, appliedZoneFilter, appliedNoteTypeFilter, appliedExtensionActivationFilter, appliedExpirationFromDate, appliedExpirationToDate, selectedOperationalRegionId, selectedOperationalResellerId],
+    queryKey: ['subscribers', 'offline', online, currentPage, pageSize, debouncedSearchTerm, statusFilter, sortDescending, appliedMaxDaysUntilExpiry, appliedFatFilter, appliedApartmentNumberFilter, appliedZoneFilter, appliedProfileIdsFilter, appliedNoteTypeFilter, appliedExtensionActivationFilter, appliedExpirationFromDate, appliedExpirationToDate, selectedOperationalRegionId, selectedOperationalResellerId],
     queryFn: async () => {
       const daysNum = appliedMaxDaysUntilExpiry.trim() === '' ? undefined : parseInt(appliedMaxDaysUntilExpiry, 10);
       const noteTypeNum =
@@ -374,7 +380,9 @@ const SubscribersPage: React.FC = () => {
         sortDescending: sortDescending,
         maxDaysUntilExpiry: daysNum !== undefined && !isNaN(daysNum) && daysNum >= 0 ? daysNum : undefined,
         fat: appliedFatFilter.trim() || undefined,
+        apartmentNumber: appliedApartmentNumberFilter.trim() || undefined,
         zone: appliedZoneFilter.trim() || undefined,
+        profileIds: appliedProfileIdsFilter.length > 0 ? appliedProfileIdsFilter : undefined,
         noteType: noteTypeNum !== undefined && !isNaN(noteTypeNum as any) ? noteTypeNum : undefined,
         hasExtensionActivation: appliedExtensionActivationFilter || undefined,
         expirationFromDate: appliedExpirationFromDate.trim() || undefined,
@@ -387,7 +395,9 @@ const SubscribersPage: React.FC = () => {
       };
       if (params.maxDaysUntilExpiry === undefined) delete params.maxDaysUntilExpiry;
       if (params.fat === undefined) delete params.fat;
+      if (params.apartmentNumber === undefined) delete params.apartmentNumber;
       if (params.zone === undefined) delete params.zone;
+      if (params.profileIds === undefined) delete params.profileIds;
       if (params.noteType === undefined) delete params.noteType;
       if (params.hasExtensionActivation === undefined) delete params.hasExtensionActivation;
       if (params.expirationFromDate === undefined) delete params.expirationFromDate;
@@ -968,6 +978,7 @@ const SubscribersPage: React.FC = () => {
         expirationDate: new Date().toISOString().split('T')[0],
         subscriptionType: SubscriptionType.Paid,
         fat: '',
+        apartmentNumber: '',
         zone: '',
         agentResellerId: selectedOperationalResellerId || ''
       });
@@ -1103,9 +1114,13 @@ const SubscribersPage: React.FC = () => {
     setMaxDaysUntilExpiry('');
     setAppliedMaxDaysUntilExpiry('');
     setFatFilter('');
+    setApartmentNumberFilter('');
     setZoneFilter('');
+    setProfileIdsFilter([]);
     setAppliedFatFilter('');
+    setAppliedApartmentNumberFilter('');
     setAppliedZoneFilter('');
+    setAppliedProfileIdsFilter([]);
     setNoteTypeFilter('all');
     setAppliedNoteTypeFilter('all');
     setExtensionActivationFilter(false);
@@ -1121,7 +1136,9 @@ const SubscribersPage: React.FC = () => {
     setDebouncedSearchTerm(searchTerm.trim());
     setAppliedMaxDaysUntilExpiry(maxDaysUntilExpiry.trim());
     setAppliedFatFilter(fatFilter.trim());
+    setAppliedApartmentNumberFilter(apartmentNumberFilter.trim());
     setAppliedZoneFilter(zoneFilter.trim());
+    setAppliedProfileIdsFilter([...profileIdsFilter]);
     setAppliedNoteTypeFilter(noteTypeFilter);
     setAppliedExtensionActivationFilter(extensionActivationFilter);
     setAppliedExpirationFromDate(expirationFromDate.trim());
@@ -1145,14 +1162,23 @@ const SubscribersPage: React.FC = () => {
 
   const hasActiveAdvancedFilter =
     appliedExpirationFromDate !== '' || appliedExpirationToDate !== '' ||
-    appliedMaxDaysUntilExpiry !== '' || appliedFatFilter !== '' || appliedZoneFilter !== '' ||
+    appliedMaxDaysUntilExpiry !== '' || appliedFatFilter !== '' || appliedApartmentNumberFilter !== '' ||
+    appliedZoneFilter !== '' || appliedProfileIdsFilter.length > 0 ||
     appliedNoteTypeFilter !== 'all' || appliedExtensionActivationFilter || (debouncedSearchTerm?.trim() ?? '') !== '' || statusFilter !== 'all';
+
+  const toggleProfileIdFilter = (profileId: string) => {
+    setProfileIdsFilter((prev) =>
+      prev.includes(profileId) ? prev.filter((id) => id !== profileId) : [...prev, profileId]
+    );
+  };
 
   useEffect(() => {
     if (showAdvancedFilter) {
       setSearchTerm(debouncedSearchTerm ?? '');
       setFatFilter(appliedFatFilter);
+      setApartmentNumberFilter(appliedApartmentNumberFilter);
       setZoneFilter(appliedZoneFilter);
+      setProfileIdsFilter([...appliedProfileIdsFilter]);
       setNoteTypeFilter(appliedNoteTypeFilter);
       setExtensionActivationFilter(appliedExtensionActivationFilter);
       setMaxDaysUntilExpiry(appliedMaxDaysUntilExpiry);
@@ -2229,6 +2255,7 @@ const SubscribersPage: React.FC = () => {
           expirationDate: sub.expirationDate || sub.activationDate,
           profileId,
           fat: sub.fat ?? '',
+          apartmentNumber: sub.apartmentNumber ?? '',
           zone: sub.zone ?? '',
           noteType,
           note: noteType === SubscriberNoteType.Other ? (noteVal || undefined) : undefined,
@@ -2578,7 +2605,7 @@ const SubscribersPage: React.FC = () => {
         {showAdvancedFilter && (
           <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              الحالة، الكابينة، المنطقة، نوع الملاحظة، ترتيب التاريخ، الأيام حتى الانتهاء، ونطاق تاريخ انتهاء الاشتراك.
+              الحالة، رقم البناية، رقم الشقة، المنطقة، الباقات، نوع الملاحظة، ترتيب التاريخ، الأيام حتى الانتهاء، ونطاق تاريخ انتهاء الاشتراك.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <div>
@@ -2607,13 +2634,24 @@ const SubscribersPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">الكابينة</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">رقم البناية</label>
                 <input
                   type="text"
-                  placeholder="الكابينة"
+                  placeholder="رقم البناية"
                   maxLength={200}
                   value={fatFilter}
                   onChange={(e) => setFatFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">رقم الشقة</label>
+                <input
+                  type="text"
+                  placeholder="مثل: 12B"
+                  maxLength={200}
+                  value={apartmentNumberFilter}
+                  onChange={(e) => setApartmentNumberFilter(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 />
               </div>
@@ -2672,6 +2710,38 @@ const SubscribersPage: React.FC = () => {
                   onChange={(e) => setExpirationToDate(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">الباقات</label>
+                <div className="max-h-36 overflow-y-auto rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-2 space-y-1">
+                  {activeProfiles.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 px-1 py-2">لا توجد باقات نشطة</p>
+                  ) : (
+                    activeProfiles.map((profile) => (
+                      <label
+                        key={profile.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-600/50 cursor-pointer text-sm text-gray-800 dark:text-gray-200"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={profileIdsFilter.includes(profile.id)}
+                          onChange={() => toggleProfileIdFilter(profile.id)}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="truncate">{profile.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {profileIdsFilter.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setProfileIdsFilter([])}
+                    className="mt-1 text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                  >
+                    مسح اختيار الباقات
+                  </button>
+                )}
               </div>
               <div className="flex items-end">
                 <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -2799,7 +2869,10 @@ const SubscribersPage: React.FC = () => {
                   شركة الوكيل
                 </th>
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('fat')}`}>
-                  الكابينة
+                  رقم البناية
+                </th>
+                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('apartmentNumber')}`}>
+                  رقم الشقة
                 </th>
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('zone')}`}>
                   المنطقة
@@ -2880,6 +2953,9 @@ const SubscribersPage: React.FC = () => {
                   </td>
                   <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('fat')}`}>
                     {subscriber.fat ?? '—'}
+                  </td>
+                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('apartmentNumber')}`}>
+                    {subscriber.apartmentNumber ?? '—'}
                   </td>
                   <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('zone')}`}>
                     {subscriber.zone ?? '—'}
@@ -3202,11 +3278,11 @@ const SubscribersPage: React.FC = () => {
                 )}
               </div>
 
-              {/* الكابينة والمنطقة */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* رقم البناية ورقم الشقة والمنطقة */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    الكابينة
+                    رقم البناية
                   </label>
                   <input
                     type="text"
@@ -3215,7 +3291,21 @@ const SubscribersPage: React.FC = () => {
                     onChange={handleInputChange}
                     maxLength={200}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="الكابينة (اختياري)"
+                    placeholder="رقم البناية (اختياري)"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    رقم الشقة
+                  </label>
+                  <input
+                    type="text"
+                    name="apartmentNumber"
+                    value={formData.apartmentNumber ?? ''}
+                    onChange={handleInputChange}
+                    maxLength={200}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="مثل: 12B (اختياري)"
                   />
                 </div>
                 <div>

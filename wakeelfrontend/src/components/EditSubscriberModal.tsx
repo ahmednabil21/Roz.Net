@@ -35,6 +35,7 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
     activationDate: subscriber.activationDate,
     expirationDate: subscriber.expirationDate || subscriber.activationDate,
     fat: subscriber.fat ?? '',
+    apartmentNumber: subscriber.apartmentNumber ?? '',
     zone: subscriber.zone ?? ''
   });
 
@@ -58,6 +59,7 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
         activationDate: subscriber.activationDate,
         expirationDate: subscriber.expirationDate || subscriber.activationDate,
         fat: subscriber.fat ?? '',
+        apartmentNumber: subscriber.apartmentNumber ?? '',
         zone: subscriber.zone ?? ''
       });
     }
@@ -240,10 +242,10 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
               </div>
             </div>
 
-            {/* الكابينة */}
+            {/* رقم البناية */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                الكابينة
+                رقم البناية
               </label>
               <input
                 type="text"
@@ -251,7 +253,22 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
                 value={formData.fat ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                placeholder="الكابينة (اختياري)"
+                placeholder="رقم البناية (اختياري)"
+              />
+            </div>
+
+            {/* رقم الشقة */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                رقم الشقة
+              </label>
+              <input
+                type="text"
+                name="apartmentNumber"
+                value={formData.apartmentNumber ?? ''}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                placeholder="مثل: 12B (اختياري)"
               />
             </div>
 

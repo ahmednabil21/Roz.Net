@@ -1697,7 +1697,14 @@ class ApiService {
         cleanParams.maxDaysUntilExpiry = params.maxDaysUntilExpiry;
       }
       if (params?.fat?.trim()) cleanParams.fat = params.fat.trim();
+      if (params?.apartmentNumber?.trim()) cleanParams.apartmentNumber = params.apartmentNumber.trim();
       if (params?.zone?.trim()) cleanParams.zone = params.zone.trim();
+      const profileIds = (params?.profileIds ?? []).map((id) => id.trim()).filter(Boolean);
+      if (profileIds.length > 0) {
+        cleanParams.profileIds = profileIds;
+      } else if (params?.profileId?.trim()) {
+        cleanParams.profileId = params.profileId.trim();
+      }
       if (params?.noteType !== undefined && params.noteType !== null) {
         cleanParams.noteType = params.noteType;
       }
@@ -1720,7 +1727,10 @@ class ApiService {
       console.log('🌐 API: getSubscribers called with params:', cleanParams);
       console.log('🌐 API: Full URL will be:', this.api.defaults.baseURL + '/subscribers?' + new URLSearchParams(cleanParams).toString());
       
-      const response: AxiosResponse<PaginatedResponse<Subscriber>> = await this.api.get('/subscribers', { params: cleanParams });
+      const response: AxiosResponse<PaginatedResponse<Subscriber>> = await this.api.get('/subscribers', {
+        params: cleanParams,
+        paramsSerializer: { indexes: null },
+      });
       console.log('✅ API: getSubscribers response received:', {
         totalItems: response.data.totalItems,
         dataLength: response.data.data?.length,

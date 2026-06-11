@@ -543,7 +543,8 @@ const SubscriberDetailsPage: React.FC = () => {
                 />
                 <InfoCell label="معرف الاشتراك" value={subscriber.secruptionId?.trim() || '—'} icon={<Hash className="h-3.5 w-3.5" />} />
                 <InfoCell label="FTTH subscription" value={subscriber.ftthSubscriptionId?.trim() || '—'} />
-                <InfoCell label="الكابينة (FAT)" value={subscriber.fat?.trim() || '—'} icon={<MapPin className="h-3.5 w-3.5" />} />
+                <InfoCell label="رقم البناية" value={subscriber.fat?.trim() || '—'} icon={<MapPin className="h-3.5 w-3.5" />} />
+                <InfoCell label="رقم الشقة" value={subscriber.apartmentNumber?.trim() || '—'} />
                 <InfoCell label="المنطقة" value={subscriber.zone?.trim() || '—'} />
                 <InfoCell label="نوع الملاحظة" value="" custom={getNoteTypeBadge(subscriber.noteType, subscriber.note ?? null)} />
                 {((subscriber.noteType === SubscriberNoteType.Other) ||
