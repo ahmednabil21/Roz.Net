@@ -360,8 +360,8 @@ const SubscribersPage: React.FC = () => {
     serviceFeesAmountPaid: undefined,
     activationPaymentMethod: ActivationPaymentMethod.Cash,
   });
-  /** واصل أجور الخدمة — مفعّل: يُضاف المبلغ للفاتورة؛ غير مفعّل: دين على المشترك */
-  const [serviceFeesFullyPaid, setServiceFeesFullyPaid] = useState(true);
+  /** مفعّل = تُضاف أجور الخدمة للفاتورة (واصل) — افتراضي ON لكل البنود */
+  const [activationServiceFeesEnabled, setActivationServiceFeesEnabled] = useState<Record<string, boolean>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
@@ -446,14 +446,15 @@ const SubscribersPage: React.FC = () => {
     enabled: showRenewalModal,
   });
 
-  const selectedActivationServiceFee = React.useMemo(
-    () => activationServiceFeesList.find((f) => f.id === renewalData.serviceFeesId) ?? null,
-    [activationServiceFeesList, renewalData.serviceFeesId]
+  const enabledActivationServiceFees = React.useMemo(
+    () => activationServiceFeesList.filter((f) => activationServiceFeesEnabled[f.id] !== false),
+    [activationServiceFeesList, activationServiceFeesEnabled]
   );
 
-  const activationServiceFeesPrice = selectedActivationServiceFee
-    ? (renewalData.serviceFeesPrice ?? selectedActivationServiceFee.price ?? 0)
-    : 0;
+  const activationServiceFeesTotal = React.useMemo(
+    () => enabledActivationServiceFees.reduce((sum, f) => sum + (f.price ?? 0), 0),
+    [enabledActivationServiceFees]
+  );
 
   const effectiveSyncServiceFeesList = React.useMemo(
     () => (syncServiceFeesList.length > 0 ? syncServiceFeesList : activationServiceFeesList),
@@ -716,7 +717,22 @@ const SubscribersPage: React.FC = () => {
   }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice]);
 
   const renewalInvoiceTotalWithServiceFees =
-    renewalSubscriptionPrice + (selectedActivationServiceFee && serviceFeesFullyPaid ? activationServiceFeesPrice : 0);
+    renewalSubscriptionPrice + activationServiceFeesTotal;
+
+  useEffect(() => {
+    if (!showRenewalModal || activationServiceFeesList.length === 0) return;
+    setActivationServiceFeesEnabled((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const fee of activationServiceFeesList) {
+        if (next[fee.id] === undefined) {
+          next[fee.id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [showRenewalModal, activationServiceFeesList]);
 
   useEffect(() => {
     if (renewalInfo && !renewalData.newProfileId) {
@@ -740,7 +756,7 @@ const SubscribersPage: React.FC = () => {
   useEffect(() => {
     if (!showRenewalModal) {
       renewalProfileIdForAmountSyncRef.current = '';
-      setServiceFeesFullyPaid(true);
+      setActivationServiceFeesEnabled({});
     } else {
       setRenewalAmountFullyReceived(true);
     }
@@ -963,7 +979,7 @@ const SubscribersPage: React.FC = () => {
         serviceFeesAmountPaid: undefined,
         activationPaymentMethod: ActivationPaymentMethod.Cash,
       });
-      setServiceFeesFullyPaid(true);
+      setActivationServiceFeesEnabled({});
       setRenewalViaSasTab(false);
       setPendingFtthRenewalRowIndex(rowIndex);
       setShowAutoSyncModal(false);
@@ -1114,7 +1130,7 @@ const SubscribersPage: React.FC = () => {
         serviceFeesAmountPaid: undefined,
         activationPaymentMethod: ActivationPaymentMethod.Cash,
       });
-      setServiceFeesFullyPaid(true);
+      setActivationServiceFeesEnabled({});
     },
     onError: (error: any) => {
       console.error('Error creating renewal:', error);
@@ -1509,16 +1525,6 @@ const SubscribersPage: React.FC = () => {
           }
         }
 
-        if (name === 'serviceFeesId') {
-          const feeId = String(newValue ?? '').trim();
-          if (!feeId) {
-            updated.serviceFeesPrice = undefined;
-          } else {
-            const fee = activationServiceFeesList.find((f) => f.id === feeId);
-            updated.serviceFeesPrice = fee?.price ?? 0;
-          }
-        }
-
         if (name === 'serviceFeesPrice') {
           updated.serviceFeesPrice = Math.max(0, Number(newValue) || 0);
         }
@@ -1541,12 +1547,15 @@ const SubscribersPage: React.FC = () => {
       }
     }
 
-    const serviceFeesId = (renewalData.serviceFeesId || '').trim();
-    const serviceFeesPrice = renewalData.serviceFeesPrice ?? selectedActivationServiceFee?.price ?? 0;
-    if (serviceFeesId && serviceFeesPrice < 0) {
-      showError('خطأ', 'أدخل سعراً صحيحاً لأجور الخدمة.');
-      return;
-    }
+    const serviceFeesItems = enabledActivationServiceFees.map((fee) => {
+      const price = fee.price ?? 0;
+      return {
+        serviceFeesId: fee.id,
+        serviceFeesPrice: price,
+        serviceFeesAmountPaid: price,
+      };
+    });
+    const firstServiceFee = serviceFeesItems[0];
 
     const enhancedRenewalData: RenewalData = {
       ...renewalData,
@@ -1563,9 +1572,10 @@ const SubscribersPage: React.FC = () => {
       debtDueDate: isExtension ? '' : renewalData.debtDueDate,
       currentExpirationDate: renewalInfo?.expirationDate,
       renewalPeriod: selectedProfile?.renewalPeriod || 30,
-      serviceFeesId: serviceFeesId || undefined,
-      serviceFeesPrice: serviceFeesId ? serviceFeesPrice : undefined,
-      serviceFeesAmountPaid: serviceFeesId ? (serviceFeesFullyPaid ? serviceFeesPrice : 0) : undefined,
+      serviceFeesItems: serviceFeesItems.length > 0 ? serviceFeesItems : undefined,
+      serviceFeesId: firstServiceFee?.serviceFeesId,
+      serviceFeesPrice: firstServiceFee?.serviceFeesPrice,
+      serviceFeesAmountPaid: firstServiceFee?.serviceFeesAmountPaid,
       activationPaymentMethod: isExtension
         ? ActivationPaymentMethod.Cash
         : (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash),
@@ -3532,39 +3542,40 @@ const SubscribersPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         طريقة الدفع *
                       </label>
-                      <div className="flex flex-wrap gap-6">
-                        <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-900 dark:text-white">
-                          <input
-                            type="radio"
-                            name="activationPaymentMethod"
-                            value={ActivationPaymentMethod.Cash}
-                            checked={(renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) === ActivationPaymentMethod.Cash}
-                            onChange={() =>
-                              setRenewalData((prev) => ({
-                                ...prev,
-                                activationPaymentMethod: ActivationPaymentMethod.Cash,
-                              }))
-                            }
-                            className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
-                          />
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRenewalData((prev) => ({
+                              ...prev,
+                              activationPaymentMethod: ActivationPaymentMethod.Cash,
+                            }))
+                          }
+                          className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                            (renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash) ===
+                            ActivationPaymentMethod.Cash
+                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                          }`}
+                        >
                           كاش
-                        </label>
-                        <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-gray-900 dark:text-white">
-                          <input
-                            type="radio"
-                            name="activationPaymentMethod"
-                            value={ActivationPaymentMethod.Master}
-                            checked={renewalData.activationPaymentMethod === ActivationPaymentMethod.Master}
-                            onChange={() =>
-                              setRenewalData((prev) => ({
-                                ...prev,
-                                activationPaymentMethod: ActivationPaymentMethod.Master,
-                              }))
-                            }
-                            className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
-                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRenewalData((prev) => ({
+                              ...prev,
+                              activationPaymentMethod: ActivationPaymentMethod.Master,
+                            }))
+                          }
+                          className={`rounded-xl border-2 px-4 py-4 text-sm font-semibold transition-all duration-200 ${
+                            renewalData.activationPaymentMethod === ActivationPaymentMethod.Master
+                              ? 'border-purple-600 bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-purple-300 dark:hover:border-purple-500'
+                          }`}
+                        >
                           ماستر
-                        </label>
+                        </button>
                       </div>
                     </div>
                   );
@@ -3692,104 +3703,70 @@ const SubscribersPage: React.FC = () => {
 
               {/* أجور الخدمة */}
               {activationServiceFeesList.length > 0 && (
-                <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة (اختياري)</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        نوع الخدمة
-                      </label>
-                      <select
-                        name="serviceFeesId"
-                        value={renewalData.serviceFeesId || ''}
-                        onChange={(e) => {
-                          handleRenewalInputChange(e);
-                          if (e.target.value) {
-                            setServiceFeesFullyPaid(true);
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                      >
-                        <option value="">بدون أجور خدمة</option>
-                        {activationServiceFeesList.map((fee) => (
-                          <option key={fee.id} value={fee.id}>
-                            {fee.name} — {formatNumber(fee.price, { suffix: ' د.ع' })}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {selectedActivationServiceFee && (
-                      <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            سعر الخدمة (د.ع)
-                          </label>
-                          <input
-                            type="number"
-                            name="serviceFeesPrice"
-                            value={renewalData.serviceFeesPrice ?? ''}
-                            onChange={handleRenewalInputChange}
-                            min={0}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                          />
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            الافتراضي: {formatNumber(selectedActivationServiceFee.price, { suffix: ' د.ع' })} — قابل للتعديل
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">واصل</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                              {serviceFeesFullyPaid
-                                ? 'المبلغ كامل — يُضاف إلى الفاتورة'
-                                : 'غير واصل — يُسجَّل كدين على المشترك'}
+                <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة</h3>
+                  <div className="space-y-2">
+                    {activationServiceFeesList.map((fee) => {
+                      const isEnabled = activationServiceFeesEnabled[fee.id] !== false;
+                      const feePrice = fee.price ?? 0;
+                      return (
+                        <div
+                          key={fee.id}
+                          className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{fee.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 tabular-nums">
+                              {formatNumber(feePrice, { suffix: ' د.ع' })}
+                              {isEnabled ? ' — يُضاف للفاتورة' : ' — غير مفعّل'}
                             </p>
                           </div>
                           <button
                             type="button"
                             role="switch"
-                            aria-checked={serviceFeesFullyPaid}
-                            aria-label="واصل أجور الخدمة"
-                            onClick={() => setServiceFeesFullyPaid((v) => !v)}
+                            aria-checked={isEnabled}
+                            aria-label={`تفعيل ${fee.name}`}
+                            onClick={() =>
+                              setActivationServiceFeesEnabled((prev) => ({
+                                ...prev,
+                                [fee.id]: !isEnabled,
+                              }))
+                            }
                             className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                              serviceFeesFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                              isEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
                             }`}
                           >
                             <span
                               aria-hidden
                               className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                serviceFeesFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                isEnabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
                               }`}
                             />
                           </button>
                         </div>
-
-                        <div className="md:col-span-2 rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 space-y-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">سعر الاشتراك:</span>
-                            <span className="font-medium tabular-nums">{formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}</span>
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              أجور الخدمة ({selectedActivationServiceFee.name}):
-                            </span>
-                            <span className={`font-medium tabular-nums ${serviceFeesFullyPaid ? 'text-gray-900 dark:text-white' : 'text-amber-700 dark:text-amber-300'}`}>
-                              {formatNumber(activationServiceFeesPrice, { suffix: ' د.ع' })}
-                              {!serviceFeesFullyPaid ? ' (دين)' : ''}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-base font-bold pt-2 mt-1 border-t border-primary-200/70 dark:border-primary-800/70">
-                            <span className="text-gray-900 dark:text-white">إجمالي الفاتورة:</span>
-                            <span className="text-primary-700 dark:text-primary-300 tabular-nums">
-                              {formatNumber(renewalInvoiceTotalWithServiceFees, { suffix: ' د.ع' })}
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                      );
+                    })}
                   </div>
+                  {enabledActivationServiceFees.length > 0 && (
+                    <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 space-y-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">سعر الاشتراك:</span>
+                        <span className="font-medium tabular-nums">{formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">مجموع أجور الخدمة:</span>
+                        <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                          {formatNumber(activationServiceFeesTotal, { suffix: ' د.ع' })}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-base font-bold pt-2 mt-1 border-t border-primary-200/70 dark:border-primary-800/70">
+                        <span className="text-gray-900 dark:text-white">إجمالي الفاتورة:</span>
+                        <span className="text-primary-700 dark:text-primary-300 tabular-nums">
+                          {formatNumber(renewalInvoiceTotalWithServiceFees, { suffix: ' د.ع' })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

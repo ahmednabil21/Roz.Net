@@ -72,13 +72,6 @@ function getBaghdadDateDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function packageTypeLabel(value?: number | null): string {
-  if (value === ProfilePackageType.Subscription) return 'اشتراك';
-  if (value === ProfilePackageType.Extension) return 'تمديد';
-  if (value === ProfilePackageType.SpecialOffer) return 'عرض خاص';
-  return '—';
-}
-
 function ledgerKindLabel(kind: string): string {
   if (kind === 'Renewal') return 'تفعيل';
   if (kind === 'DebtPayment') return 'تسديد دين';
@@ -91,11 +84,10 @@ function activationPaymentMethodLabel(pm?: number | null): string {
   return '—';
 }
 
-const LEDGER_TABLE_COLS = 18;
+const LEDGER_TABLE_COLS = 15;
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
   kind: 'Renewal';
-  packageType?: number;
   profileName?: string;
   receiptNumber?: string;
   activationProfit?: number;
@@ -103,9 +95,6 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   serviceFeesAmount?: number;
   totalProfit?: number;
   returnPrice?: number;
-  subscriberNoteType?: number | null;
-  notes?: string | null;
-  note?: string | null;
   agentResellerId?: string;
 } {
   return row.kind === 'Renewal';
@@ -267,12 +256,6 @@ const ReportsPage: React.FC = () => {
     },
     onError: (err: unknown) => showError('خطأ', ApiService.showError(err)),
   });
-
-  const noteTypeLabelMap = useMemo(() => {
-    const map = new Map<number, string>();
-    (accounts?.subscriberNoteTypes ?? []).forEach((opt) => map.set(opt.value, opt.labelAr));
-    return map;
-  }, [accounts?.subscriberNoteTypes]);
 
   const resellerNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -684,22 +667,19 @@ const ReportsPage: React.FC = () => {
                     <thead>
                       <tr>
                         <th>الرسيلر</th>
+                        <th>النوع</th>
                         <th>اسم المشترك</th>
                         <th>يوزر المشترك</th>
-                        <th>النوع</th>
                         <th>الباقة</th>
-                        <th>المبلغ</th>
                         <th>طريقة الدفع</th>
+                        <th>كلفة الاشتراك</th>
                         <th>ربح الاجور</th>
+                        <th>الربح</th>
                         <th>الربح الكلي</th>
                         <th>مبلغ الكاشباك</th>
-                        <th>نوع الباقة</th>
                         <th>تاريخ العملية</th>
                         <th>تاريخ الإنشاء</th>
                         <th>رقم الفاتورة</th>
-                        <th>نوع ملاحظة المشترك</th>
-                        <th>ملاحظات</th>
-                        <th>معرف الدين</th>
                         <th>نفّذ بواسطة</th>
                         {canDeleteLedger && <th className="w-[1%]" />}
                       </tr>
@@ -714,11 +694,6 @@ const ReportsPage: React.FC = () => {
                       ) : (
                         ledgerRows.map((row) => {
                           const renewal = isRenewalEntry(row) ? row : null;
-                          const noteLabel =
-                            renewal?.subscriberNoteType != null
-                              ? noteTypeLabelMap.get(Number(renewal.subscriberNoteType)) ?? '—'
-                              : '—';
-                          const renewalNotes = [renewal?.notes, renewal?.note].filter(Boolean).join(' · ') || '—';
                           const resellerName =
                             renewal?.agentResellerId != null
                               ? resellerNameById.get(renewal.agentResellerId) ?? renewal.agentResellerId
@@ -727,8 +702,6 @@ const ReportsPage: React.FC = () => {
                           return (
                             <tr key={`${row.kind}-${row.id}`}>
                               <td>{resellerName}</td>
-                              <td>{row.subscriberName || '—'}</td>
-                              <td className="whitespace-nowrap font-mono text-xs">{row.username || '—'}</td>
                               <td className="whitespace-nowrap">
                                 <span
                                   className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
@@ -740,12 +713,14 @@ const ReportsPage: React.FC = () => {
                                   {ledgerKindLabel(row.kind)}
                                 </span>
                               </td>
+                              <td>{row.subscriberName || '—'}</td>
+                              <td className="whitespace-nowrap font-mono text-xs">{row.username || '—'}</td>
                               <td>{renewal?.profileName || '—'}</td>
-                              <td className="whitespace-nowrap font-medium">
-                                {formatNumber(row.amount ?? 0, { suffix: ' د.ع' })}
-                              </td>
                               <td className="whitespace-nowrap">
                                 {renewal ? activationPaymentMethodLabel(renewal.paymentMethod) : '—'}
+                              </td>
+                              <td className="whitespace-nowrap font-medium">
+                                {formatNumber(row.amount ?? 0, { suffix: ' د.ع' })}
                               </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.serviceFeesAmount != null
@@ -753,30 +728,23 @@ const ReportsPage: React.FC = () => {
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
+                                {renewal?.activationProfit != null
+                                  ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
+                                  : '—'}
+                              </td>
+                              <td className="whitespace-nowrap">
                                 {renewal?.totalProfit != null
                                   ? formatNumber(renewal.totalProfit, { suffix: ' د.ع' })
-                                  : renewal?.activationProfit != null
-                                    ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
-                                    : '—'}
+                                  : '—'}
                               </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.returnPrice != null
                                   ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
-                              <td className="whitespace-nowrap">
-                                {renewal ? packageTypeLabel(renewal.packageType) : '—'}
-                              </td>
                               <td className="whitespace-nowrap">{formatDate(row.renewalDate)}</td>
                               <td className="whitespace-nowrap">{formatDate(row.createdAt)}</td>
                               <td className="whitespace-nowrap text-xs">{renewal?.receiptNumber || '—'}</td>
-                              <td>{renewal ? noteLabel : '—'}</td>
-                              <td className="max-w-[200px] truncate" title={renewalNotes !== '—' ? renewalNotes : undefined}>
-                                {renewal ? renewalNotes : '—'}
-                              </td>
-                              <td className="whitespace-nowrap text-xs font-mono">
-                                {row.kind === 'DebtPayment' && row.debtId ? row.debtId : '—'}
-                              </td>
                               <td className="whitespace-nowrap">{row.executedByFullName || '—'}</td>
                               {canDeleteLedger && (
                                 <td className="text-center">

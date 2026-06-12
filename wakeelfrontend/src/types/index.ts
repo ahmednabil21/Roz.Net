@@ -2057,8 +2057,16 @@ export interface RenewalData {
   serviceFeesPrice?: number;
   /** يُرسل فقط عند تفعيل خيار إضافة أجور الخدمة للفاتورة */
   serviceFeesAmountPaid?: number;
+  /** عدة أجور خدمة مفعّلة — POST /Renewals */
+  serviceFeesItems?: RenewalServiceFeeLineItem[];
   /** طريقة الدفع عند التفعيل — 1 كاش، 2 ماستر */
   activationPaymentMethod?: ActivationPaymentMethod;
+}
+
+export interface RenewalServiceFeeLineItem {
+  serviceFeesId: string;
+  serviceFeesPrice: number;
+  serviceFeesAmountPaid: number;
 }
 
 export interface SubscriberRenewalInfo {
