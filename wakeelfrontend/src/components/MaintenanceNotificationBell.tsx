@@ -34,7 +34,7 @@ const MaintenanceNotificationBell: React.FC = () => {
       <Bell className={`h-5 w-5 sm:h-6 sm:w-6 ${hasUnread && showBadge ? 'fill-red-100 dark:fill-red-900/30' : ''}`} />
       {showBadge && (
         <span
-          className={`absolute top-1 left-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center leading-none ${
+          className={`absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center leading-none ${
             hasUnread ? 'bg-red-500 ring-2 ring-white dark:ring-gray-800' : 'bg-gray-500'
           }`}
         >

@@ -387,9 +387,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
   };
 
   return (
-    <div className={`sidebar-shell bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 h-full flex flex-col ${
+    <div
+      dir="rtl"
+      className={`sidebar-shell bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 h-full flex flex-col border-s border-gray-200 dark:border-gray-700 ${
       !isMobileOverlay && (isCollapsed ? 'w-12 sm:w-16' : 'w-56 sm:w-64')
-    } ${isMobileOverlay ? 'w-full' : ''}`}>
+    } ${isMobileOverlay ? 'w-full' : ''}`}
+    >
       <div className="flex flex-col h-full min-h-0">
         {/* Header */}
         <div className="sidebar-header flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -407,6 +410,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
             </>
           ) : (
             <>
+              {!isCollapsed && (
+                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
+                  نظام الوكيل
+                </h1>
+              )}
               <button
                 type="button"
                 onClick={onToggleCollapse}
@@ -418,11 +426,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                   <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-400" />
                 )}
               </button>
-              {!isCollapsed && (
-                <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
-                  نظام الوكيل
-                </h1>
-              )}
             </>
           )}
         </div>
@@ -430,7 +433,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
         {/* User Info */}
         {!isCollapsed && user && (
           <div className="p-2 sm:p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-primary-600 dark:text-primary-400 text-xs sm:text-sm font-semibold">
+                  {user.fullName?.charAt(0) || '?'}
+                </span>
+              </div>
               <div className="flex-1 min-w-0 text-right">
                 <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">
                   {user.fullName || 'مستخدم'}
@@ -451,11 +459,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                     {daysLeft <= 0 ? 'انتهى الاشتراك' : `متبقي ${daysLeft} يوم`}
                   </div>
                 )}
-              </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                <span className="text-primary-600 dark:text-primary-400 text-xs sm:text-sm font-semibold">
-                  {user.fullName?.charAt(0) || '?'}
-                </span>
               </div>
             </div>
           </div>
@@ -479,11 +482,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                       isChildActive ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
+                    <Icon className="h-5 w-5 flex-shrink-0" />
                     {(!isCollapsed || isMobileOverlay) && (
                       <span className="text-sm font-medium flex-1 text-right">{item.name}</span>
                     )}
                     {isExpanded ? <ChevronUp className="h-5 w-5 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 flex-shrink-0" />}
-                    <Icon className="h-5 w-5 flex-shrink-0" />
                   </button>
                   {isExpanded && item.children!
                     .filter((child) => {
@@ -522,7 +525,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                         key={child.path}
                         to={child.path}
                         onClick={onClose}
-                        className={`sidebar-menu-child flex items-center gap-2 sm:gap-3 px-3 sm:px-3 py-2 sm:py-2 rounded-lg transition-colors touch-manipulation min-h-[40px] mr-4 border-r-2 ${
+                        className={`sidebar-menu-child flex items-center gap-2 sm:gap-3 px-3 sm:px-3 py-2 sm:py-2 rounded-lg transition-colors touch-manipulation min-h-[40px] me-4 border-e-2 ${
                           isActive
                             ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border-primary-500'
                             : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border-transparent'
@@ -550,8 +553,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
+                <Icon className="h-5 w-5 flex-shrink-0" />
                 {(!isCollapsed || isMobileOverlay) && (
-                  <span className="text-sm font-medium flex-1 text-right flex items-center justify-end gap-2">
+                  <span className="text-sm font-medium flex-1 text-right flex items-center gap-2">
                     {item.name}
                     {item.path === '/admin/maintenance-requests' &&
                       maintenanceNotify?.hasUnread &&
@@ -560,7 +564,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                       )}
                   </span>
                 )}
-                <Icon className="h-5 w-5 flex-shrink-0" />
               </Link>
             );
           })}
@@ -577,12 +580,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
             }`}
             title={`الثيم الحالي: ${theme === 'light' ? 'نهاري' : theme === 'dark' ? 'ليلي' : 'نظام'}`}
           >
+            {getThemeIcon()}
             {(!isCollapsed || isMobileOverlay) && (
               <span className="text-sm flex-1 text-right">
                 {theme === 'light' ? 'نهاري' : theme === 'dark' ? 'ليلي' : 'نظام'}
               </span>
             )}
-            {getThemeIcon()}
           </button>
 
           {/* Logout */}
@@ -593,10 +596,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
               isCollapsed && !isMobileOverlay ? 'justify-center' : ''
             }`}
           >
+            <LogOut className="h-5 w-5 flex-shrink-0" />
             {(!isCollapsed || isMobileOverlay) && (
               <span className="text-sm font-medium flex-1 text-right">تسجيل الخروج</span>
             )}
-            <LogOut className="h-5 w-5 flex-shrink-0" />
           </button>
         </div>
       </div>

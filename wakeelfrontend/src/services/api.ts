@@ -2018,6 +2018,45 @@ class ApiService {
     return response.data;
   }
 
+  /** تفاصيل المشترك — GET /subscribers/{id} مع توكن تطبيق المشترك */
+  async getSubscriberByIdForApp(id: string): Promise<Subscriber> {
+    const response: AxiosResponse<Subscriber> = await this.api.get(`/subscribers/${encodeURIComponent(id)}`, {
+      useSubscriberAuth: true,
+      skipAuthRedirect: true,
+    });
+    const d = response.data as unknown as Record<string, unknown>;
+    const mr = d.maintenanceRecords ?? d.MaintenanceRecords;
+    return {
+      ...response.data,
+      paymentStatus: response.data.paymentStatus === 0 ? PaymentStatus.Unknown : response.data.paymentStatus,
+      paymentMethod: (d.paymentMethod ?? d.PaymentMethod ?? null) as string | null,
+      expirationDate: response.data.expirationDate || response.data.activationDate,
+      maintenanceRecords: Array.isArray(mr) ? mr : [],
+      fat: (response.data.fat ?? d.Fat ?? null) as string | null | undefined,
+      apartmentNumber: (response.data.apartmentNumber ?? d.ApartmentNumber ?? null) as string | null | undefined,
+      profileName: (response.data.profileName ?? d.ProfileName ?? '') as string,
+    };
+  }
+
+  /** سجل التفعيلات — GET /Renewals?subscriberId=... مع توكن تطبيق المشترك */
+  async getRenewalsBySubscriberForApp(
+    subscriberId: string,
+    page: number = 1,
+    pageSize: number = 10
+  ): Promise<PaginatedResponse<RenewalHistory>> {
+    const response = await this.api.get<PaginatedResponse<RenewalHistory>>('/Renewals', {
+      params: { subscriberId, page, pageSize },
+      useSubscriberAuth: true,
+      skipAuthRedirect: true,
+    });
+    const body = response.data;
+    const raw = body?.data ?? [];
+    const data = Array.isArray(raw)
+      ? raw.map((item) => normalizeRenewalReceiptFromApi(item as unknown) as RenewalHistory)
+      : [];
+    return { ...body, data };
+  }
+
   /** إنشاء طلب صيانة — POST /SubscriberApp/maintenance-requests */
   async createSubscriberMaintenanceRequest(data: SubscriberMaintenanceRequestCreate): Promise<SubscriberMaintenanceRequestDto> {
     const response = await this.api.post<SubscriberMaintenanceRequestDto>('/SubscriberApp/maintenance-requests', data, {
