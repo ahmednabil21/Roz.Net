@@ -31,6 +31,8 @@ import {
   SubscriberUpdateRequest,
   SubscriberInfo,
   SubscriberAppLoginResponse,
+  SubscriberAppMeResponse,
+  SubscriberAppRenewalDto,
   SubscriberMaintenanceRequestCreate,
   SubscriberMaintenanceRequestDto,
   AgentSubscriberMaintenanceRequestDto,
@@ -2009,52 +2011,106 @@ class ApiService {
     }
   }
 
-  /** معلومات المشترك بعد تسجيل الدخول — GET /subscribers/info/{username} مع توكن المشترك */
-  async getSubscriberInfoForApp(username: string): Promise<SubscriberInfo> {
-    const response: AxiosResponse<SubscriberInfo> = await this.api.get(`/subscribers/info/${encodeURIComponent(username)}`, {
+  /** بيانات المشترك — GET /SubscriberApp/me */
+  async getSubscriberAppMe(): Promise<SubscriberAppMeResponse> {
+    const response = await this.api.get<unknown>('/SubscriberApp/me', {
       useSubscriberAuth: true,
       skipAuthRedirect: true,
     });
-    return response.data;
+    return this.normalizeSubscriberAppMe(response.data);
   }
 
-  /** تفاصيل المشترك — GET /subscribers/{id} مع توكن تطبيق المشترك */
-  async getSubscriberByIdForApp(id: string): Promise<Subscriber> {
-    const response: AxiosResponse<Subscriber> = await this.api.get(`/subscribers/${encodeURIComponent(id)}`, {
-      useSubscriberAuth: true,
-      skipAuthRedirect: true,
-    });
-    const d = response.data as unknown as Record<string, unknown>;
-    const mr = d.maintenanceRecords ?? d.MaintenanceRecords;
-    return {
-      ...response.data,
-      paymentStatus: response.data.paymentStatus === 0 ? PaymentStatus.Unknown : response.data.paymentStatus,
-      paymentMethod: (d.paymentMethod ?? d.PaymentMethod ?? null) as string | null,
-      expirationDate: response.data.expirationDate || response.data.activationDate,
-      maintenanceRecords: Array.isArray(mr) ? mr : [],
-      fat: (response.data.fat ?? d.Fat ?? null) as string | null | undefined,
-      apartmentNumber: (response.data.apartmentNumber ?? d.ApartmentNumber ?? null) as string | null | undefined,
-      profileName: (response.data.profileName ?? d.ProfileName ?? '') as string,
-    };
-  }
-
-  /** سجل التفعيلات — GET /Renewals?subscriberId=... مع توكن تطبيق المشترك */
-  async getRenewalsBySubscriberForApp(
-    subscriberId: string,
+  /** سجل التفعيلات — GET /SubscriberApp/renewals */
+  async getSubscriberAppRenewals(
     page: number = 1,
     pageSize: number = 10
-  ): Promise<PaginatedResponse<RenewalHistory>> {
-    const response = await this.api.get<PaginatedResponse<RenewalHistory>>('/Renewals', {
-      params: { subscriberId, page, pageSize },
+  ): Promise<PaginatedResponse<SubscriberAppRenewalDto>> {
+    const response = await this.api.get<PaginatedResponse<SubscriberAppRenewalDto>>('/SubscriberApp/renewals', {
+      params: { page, pageSize },
       useSubscriberAuth: true,
       skipAuthRedirect: true,
     });
     const body = response.data;
     const raw = body?.data ?? [];
     const data = Array.isArray(raw)
-      ? raw.map((item) => normalizeRenewalReceiptFromApi(item as unknown) as RenewalHistory)
+      ? raw.map((item) => this.normalizeSubscriberAppRenewal(item))
       : [];
     return { ...body, data };
+  }
+
+  private normalizeSubscriberAppMe(raw: unknown): SubscriberAppMeResponse {
+    if (raw == null || typeof raw !== 'object') {
+      return raw as SubscriberAppMeResponse;
+    }
+    const r = raw as Record<string, unknown>;
+    const str = (camel: string, pascal: string) => {
+      const v = r[camel] ?? r[pascal];
+      return v == null || v === '' ? undefined : String(v);
+    };
+    const num = (camel: string, pascal: string, fallback = 0) => {
+      const v = r[camel] ?? r[pascal];
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const po = r.paymentOptions ?? r.PaymentOptions;
+    const ann = r.announcements ?? r.Announcements;
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      username: str('username', 'Username') ?? '',
+      fullName: str('fullName', 'FullName') ?? '',
+      phoneNumber: str('phoneNumber', 'PhoneNumber') ?? '',
+      expirationDate: str('expirationDate', 'ExpirationDate') ?? '',
+      daysRemaining: num('daysRemaining', 'DaysRemaining'),
+      isExpired: Boolean(r.isExpired ?? r.IsExpired),
+      profileName: str('profileName', 'ProfileName') ?? '',
+      salePrice: (() => {
+        const v = r.salePrice ?? r.SalePrice;
+        if (v == null || v === '') return undefined;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      })(),
+      regionName: str('regionName', 'RegionName'),
+      agentResellerName: str('agentResellerName', 'AgentResellerName'),
+      paymentOptions: Array.isArray(po) ? (po as SubscriberAppMeResponse['paymentOptions']) : undefined,
+      announcements: Array.isArray(ann) ? (ann as SubscriberAppMeResponse['announcements']) : undefined,
+    };
+  }
+
+  private normalizeSubscriberAppRenewal(raw: unknown): SubscriberAppRenewalDto {
+    if (raw == null || typeof raw !== 'object') {
+      return raw as SubscriberAppRenewalDto;
+    }
+    const r = raw as Record<string, unknown>;
+    const str = (camel: string, pascal: string) => {
+      const v = r[camel] ?? r[pascal];
+      return v == null || v === '' ? undefined : String(v);
+    };
+    const num = (camel: string, pascal: string) => {
+      const v = r[camel] ?? r[pascal];
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      receiptNumber: str('receiptNumber', 'ReceiptNumber'),
+      finalPrice: num('finalPrice', 'FinalPrice'),
+      amountPaid: num('amountPaid', 'AmountPaid'),
+      remainingAmount: num('remainingAmount', 'RemainingAmount'),
+      renewalDate: str('renewalDate', 'RenewalDate') ?? '',
+      newExpirationDate: str('newExpirationDate', 'NewExpirationDate') ?? '',
+      newProfileName: str('newProfileName', 'NewProfileName'),
+      paymentStatus: num('paymentStatus', 'PaymentStatus'),
+      wifiCode: (r.wifiCode ?? r.WiFiCode ?? r.WifiCode ?? null) as string | null,
+    };
+  }
+
+  /** @deprecated استخدم getSubscriberAppMe */
+  async getSubscriberInfoForApp(username: string): Promise<SubscriberInfo> {
+    const response: AxiosResponse<SubscriberInfo> = await this.api.get(`/subscribers/info/${encodeURIComponent(username)}`, {
+      useSubscriberAuth: true,
+      skipAuthRedirect: true,
+    });
+    return response.data;
   }
 
   /** إنشاء طلب صيانة — POST /SubscriberApp/maintenance-requests */

@@ -5,7 +5,7 @@ import {
   SubscriberAppLoginResponse,
   SubscriberAppProblemType,
   SubscriberMaintenanceRequestDto,
-  RenewalHistory,
+  SubscriberAppRenewalDto,
 } from '../types';
 import { useDigits } from '../contexts/DigitsContext';
 import waklogo from '../images/waklogo.png';
@@ -16,14 +16,13 @@ import {
   Wrench,
   Clock,
   Receipt,
-  Building2,
-  Home,
   Wifi,
   CheckCircle2,
   XCircle,
   ChevronLeft,
   ChevronRight,
   Plus,
+  MapPin,
 } from 'lucide-react';
 
 type AppTab = 'maintenance' | 'profile' | 'renewals';
@@ -96,8 +95,6 @@ const SubscriberInfoPage: React.FC = () => {
   });
   const [maintenanceError, setMaintenanceError] = useState('');
 
-  const subscriberId = session?.subscriberId ?? '';
-
   const loginMutation = useMutation({
     mutationFn: ({ name, user }: { name: string; user: string }) =>
       apiService.subscriberAppLogin(name, user),
@@ -112,9 +109,9 @@ const SubscriberInfoPage: React.FC = () => {
   });
 
   const { data: subscriber, isLoading: profileLoading, isError: profileError, error: profileErr } = useQuery({
-    queryKey: ['subscriber-app', 'profile', subscriberId],
-    queryFn: () => apiService.getSubscriberByIdForApp(subscriberId),
-    enabled: isLoggedIn && !!subscriberId && !!localStorage.getItem(SUBSCRIBER_TOKEN_KEY),
+    queryKey: ['subscriber-app', 'me'],
+    queryFn: () => apiService.getSubscriberAppMe(),
+    enabled: isLoggedIn && !!localStorage.getItem(SUBSCRIBER_TOKEN_KEY),
     retry: false,
   });
 
@@ -126,9 +123,9 @@ const SubscriberInfoPage: React.FC = () => {
   });
 
   const { data: renewalsResponse, isLoading: renewalsLoading } = useQuery({
-    queryKey: ['subscriber-app', 'renewals', subscriberId, renewalsPage],
-    queryFn: () => apiService.getRenewalsBySubscriberForApp(subscriberId, renewalsPage, 10),
-    enabled: isLoggedIn && !!subscriberId && activeTab === 'renewals',
+    queryKey: ['subscriber-app', 'renewals', renewalsPage],
+    queryFn: () => apiService.getSubscriberAppRenewals(renewalsPage, 10),
+    enabled: isLoggedIn && !!localStorage.getItem(SUBSCRIBER_TOKEN_KEY) && activeTab === 'renewals',
     retry: false,
   });
 
@@ -182,12 +179,9 @@ const SubscriberInfoPage: React.FC = () => {
   };
 
   const displayName = subscriber?.fullName || session?.fullName || fullName;
-  const renewalProfileName = (r: RenewalHistory) => r.newProfileName || r.oldProfileName || '—';
-  const renewalPeriodLabel = (r: RenewalHistory) => {
-    if (r.renewalDays) return `${r.renewalDays} يوم`;
-    if (r.renewalPeriod) return `${r.renewalPeriod} شهر`;
-    return '—';
-  };
+  const headerRegion = subscriber?.regionName || session?.regionName;
+  const headerReseller = subscriber?.agentResellerName || session?.agentResellerName;
+  const renewalProfileName = (r: SubscriberAppRenewalDto) => r.newProfileName || '—';
 
   const navItems: { id: AppTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'maintenance', label: 'الصيانة', icon: Wrench },
@@ -271,9 +265,9 @@ const SubscriberInfoPage: React.FC = () => {
           <div className="flex-1 text-center min-w-0">
             <p className="text-xs text-white/80">مرحباً</p>
             <h1 className="text-base font-bold truncate">{displayName}</h1>
-            {(session?.regionName || session?.agentResellerName) && (
+            {(headerRegion || headerReseller) && (
               <p className="text-[11px] text-white/70 truncate mt-0.5">
-                {[session?.regionName, session?.agentResellerName].filter(Boolean).join(' · ')}
+                {[headerRegion, headerReseller].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
@@ -312,17 +306,17 @@ const SubscriberInfoPage: React.FC = () => {
                         <p className="text-slate-500 text-sm truncate" dir="ltr">{subscriber.phoneNumber || '—'}</p>
                         <span
                           className={`inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            subscriber.isActive
+                            !subscriber.isExpired
                               ? 'bg-green-100 text-green-700'
                               : 'bg-red-100 text-red-700'
                           }`}
                         >
-                          {subscriber.isActive ? (
+                          {!subscriber.isExpired ? (
                             <CheckCircle2 className="w-3.5 h-3.5" />
                           ) : (
                             <XCircle className="w-3.5 h-3.5" />
                           )}
-                          {subscriber.isActive ? 'فعّال' : 'غير فعّال'}
+                          {!subscriber.isExpired ? 'فعّال' : 'منتهي'}
                         </span>
                       </div>
                     </div>
@@ -331,23 +325,38 @@ const SubscriberInfoPage: React.FC = () => {
                   <div className="bg-white rounded-2xl px-5 shadow-sm border border-slate-100">
                     <InfoRow
                       label="الباقة"
-                      value={subscriber.profileName || '—'}
+                      value={
+                        subscriber.salePrice != null
+                          ? `${subscriber.profileName || '—'} (${formatNumber(subscriber.salePrice, { suffix: ' د.ع' })})`
+                          : subscriber.profileName || '—'
+                      }
                       icon={<Wifi className="w-5 h-5" />}
+                    />
+                    <InfoRow
+                      label="اسم المستخدم"
+                      value={<span dir="ltr">{subscriber.username || '—'}</span>}
+                      icon={<User className="w-5 h-5" />}
                     />
                     <InfoRow
                       label="رقم الهاتف"
                       value={<span dir="ltr">{subscriber.phoneNumber || '—'}</span>}
                       icon={<Phone className="w-5 h-5" />}
                     />
+                    {(subscriber.regionName || subscriber.agentResellerName) && (
+                      <InfoRow
+                        label="المنطقة / الرسيلر"
+                        value={[subscriber.regionName, subscriber.agentResellerName].filter(Boolean).join(' · ')}
+                        icon={<MapPin className="w-5 h-5" />}
+                      />
+                    )}
                     <InfoRow
-                      label="البناية"
-                      value={subscriber.fat || '—'}
-                      icon={<Building2 className="w-5 h-5" />}
-                    />
-                    <InfoRow
-                      label="رقم الشقة"
-                      value={subscriber.apartmentNumber || '—'}
-                      icon={<Home className="w-5 h-5" />}
+                      label="الأيام المتبقية"
+                      value={
+                        subscriber.isExpired
+                          ? 'منتهية'
+                          : `باقي ${subscriber.daysRemaining} ${subscriber.daysRemaining === 1 ? 'يوم' : 'أيام'}`
+                      }
+                      icon={<Clock className="w-5 h-5" />}
                     />
                     {subscriber.expirationDate && (
                       <InfoRow
@@ -443,8 +452,10 @@ const SubscriberInfoPage: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <p className="text-xs text-slate-500 mb-0.5">الفترة</p>
-                            <p className="font-semibold text-slate-800">{renewalPeriodLabel(r)}</p>
+                            <p className="text-xs text-slate-500 mb-0.5">السعر</p>
+                            <p className="font-semibold text-slate-800">
+                              {formatNumber(r.finalPrice, { suffix: ' د.ع' })}
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs text-slate-500 mb-0.5">المدفوع</p>

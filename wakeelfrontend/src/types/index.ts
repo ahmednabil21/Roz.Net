@@ -90,6 +90,37 @@ export interface SubscriberAppLoginResponse {
   agentResellerName?: string;
 }
 
+/** بيانات المشترك — GET /SubscriberApp/me */
+export interface SubscriberAppMeResponse {
+  id: string;
+  username: string;
+  fullName: string;
+  phoneNumber: string;
+  expirationDate: string;
+  daysRemaining: number;
+  isExpired: boolean;
+  profileName: string;
+  salePrice?: number;
+  regionName?: string;
+  agentResellerName?: string;
+  paymentOptions?: PaymentOption[];
+  announcements?: AgentAnnouncementDto[];
+}
+
+/** سجل تفعيل — GET /SubscriberApp/renewals */
+export interface SubscriberAppRenewalDto {
+  id: string;
+  receiptNumber?: string;
+  finalPrice: number;
+  amountPaid: number;
+  remainingAmount: number;
+  renewalDate: string;
+  newExpirationDate: string;
+  newProfileName?: string;
+  paymentStatus?: number;
+  wifiCode?: string | null;
+}
+
 /** أنواع مشاكل طلب الصيانة في تطبيق المشترك */
 export enum SubscriberAppProblemType {
   SubscriptionRenewal = 1,
