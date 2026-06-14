@@ -24,6 +24,8 @@ import {
   sasBrowserFetchAllUsers,
   buildSasExportPayload,
   normalizeSasBaseUrl,
+  parseSasTokenFromPaste,
+  isJtIqPanel,
 } from '../services/sasBrowserClient';
 import {
   UserRole,
@@ -748,24 +750,89 @@ function SettingsPage() {
   const [sasLoginUsername, setSasLoginUsername] = useState('');
   const [sasLoginPassword, setSasLoginPassword] = useState('');
   const [showSasLoginPassword, setShowSasLoginPassword] = useState(false);
+  const [sasLoginTokenPaste, setSasLoginTokenPaste] = useState('');
+  const [sasLoginMode, setSasLoginMode] = useState<'token' | 'credentials'>('token');
   const [sasBrowserFetchProgress, setSasBrowserFetchProgress] = useState('');
 
   function openSasLoginModal(reseller: AgentReseller) {
+    const base = normalizeSasBaseUrl(reseller.baseUrl?.trim() || 'https://ftth.jt.iq');
     setSasLoginReseller(reseller);
-    setSasLoginBaseUrl(normalizeSasBaseUrl(reseller.baseUrl?.trim() || 'https://ftth.jt.iq'));
+    setSasLoginBaseUrl(base);
     setSasLoginUsername(reseller.username?.trim() || '');
     setSasLoginPassword(reseller.password?.trim() || '');
+    setSasLoginTokenPaste('');
+    setSasLoginMode(isJtIqPanel(base) ? 'token' : 'credentials');
     setSasBrowserFetchProgress('');
     setSasLoginModalOpen(true);
   }
 
+  async function runSasBrowserPullWithToken(baseUrl: string, token: string) {
+    if (!sasLoginReseller) return;
+
+    setSasLoginModalOpen(false);
+    setPullPanelKind('sas');
+    setPullLoadingModalOpen(true);
+    setSasBrowserFetchProgress('جاري جلب المشتركين من SAS...');
+
+    try {
+      const rows = await sasBrowserFetchAllUsers(baseUrl, token, 100, (page, lastPage, loaded) => {
+        setSasBrowserFetchProgress(`جاري جلب الصفحة ${page} من ${lastPage} (${loaded} مشترك)...`);
+      });
+
+      setPullLoadingModalOpen(false);
+      setPullPanelKind(null);
+      setSasBrowserFetchProgress('');
+
+      if (!rows.length) {
+        showError('تصدير SAS', 'لم يُعثَر على مشتركين في استجابة SAS.');
+        setSasLoginModalOpen(true);
+        return;
+      }
+
+      setPullExportSnapshot({
+        kind: 'sas',
+        resellerId: sasLoginReseller.id,
+        resellerName: sasLoginReseller.name,
+        data: rows,
+        fullPayload: buildSasExportPayload(rows),
+      });
+      setPullResultModalOpen(true);
+      setSasLoginReseller(null);
+    } catch (err: unknown) {
+      setPullLoadingModalOpen(false);
+      setPullPanelKind(null);
+      setSasBrowserFetchProgress('');
+      const msg = err instanceof Error ? err.message : 'فشل جلب المشتركين من SAS';
+      const hint = /Failed to fetch|CORS|blocked|NetworkError/i.test(msg)
+        ? ' — قد تكون اللوحة لا تسمح بطلبات من دومين Wakeel. جرّب من نفس شبكة اللوحة.'
+        : '';
+      showError('فشل جلب SAS', msg + hint);
+      setSasLoginModalOpen(true);
+    }
+  }
+
   async function handleSasBrowserPull() {
     if (!sasLoginReseller) return;
+    const baseUrl = normalizeSasBaseUrl(sasLoginBaseUrl);
+    if (!baseUrl) {
+      showError('تسجيل SAS', 'أدخل رابط اللوحة.');
+      return;
+    }
+
+    if (sasLoginMode === 'token') {
+      try {
+        const token = parseSasTokenFromPaste(sasLoginTokenPaste);
+        await runSasBrowserPullWithToken(baseUrl, token);
+      } catch (err: unknown) {
+        showError('توكن SAS', err instanceof Error ? err.message : 'توكن غير صالح');
+      }
+      return;
+    }
+
     const username = sasLoginUsername.trim();
     const password = sasLoginPassword;
-    const baseUrl = normalizeSasBaseUrl(sasLoginBaseUrl);
-    if (!baseUrl || !username || !password) {
-      showError('تسجيل SAS', 'أدخل رابط اللوحة واسم المستخدم وكلمة المرور.');
+    if (!username || !password) {
+      showError('تسجيل SAS', 'أدخل اسم المستخدم وكلمة المرور.');
       return;
     }
 
@@ -787,16 +854,16 @@ function SettingsPage() {
 
       if (!rows.length) {
         showError('تصدير SAS', 'لم يُعثَر على مشتركين في استجابة SAS.');
+        setSasLoginModalOpen(true);
         return;
       }
 
-      const fullPayload = buildSasExportPayload(rows);
       setPullExportSnapshot({
         kind: 'sas',
         resellerId: sasLoginReseller.id,
         resellerName: sasLoginReseller.name,
         data: rows,
-        fullPayload,
+        fullPayload: buildSasExportPayload(rows),
       });
       setPullResultModalOpen(true);
       setSasLoginReseller(null);
@@ -804,11 +871,9 @@ function SettingsPage() {
       setPullLoadingModalOpen(false);
       setPullPanelKind(null);
       setSasBrowserFetchProgress('');
-      const msg = err instanceof Error ? err.message : 'فشل جلب المشتركين من SAS';
-      const hint = /Failed to fetch|CORS|blocked|NetworkError/i.test(msg)
-        ? ' — تأكد أن رابط اللوحة صحيح وأن المتصفح يصل إلى SAS (CORS).'
-        : '';
-      showError('فشل جلب SAS من المتصفح', msg + hint);
+      const msg = err instanceof Error ? err.message : 'فشل تسجيل الدخول';
+      showError('فشل تسجيل SAS', msg);
+      setSasLoginMode('token');
       setSasLoginModalOpen(true);
     }
   }
@@ -3816,11 +3881,11 @@ function SettingsPage() {
     {/* مودال تسجيل دخول SAS — قبل سحب المشتركين من المتصفح */}
     {sasLoginModalOpen && sasLoginReseller && (
       <div className="fixed inset-0 z-[115] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl">
+        <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl">
           <div className="bg-gradient-to-l from-emerald-600 to-emerald-800 px-6 py-4 text-white">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm text-emerald-100/90">تسجيل دخول SAS</p>
+                <p className="text-sm text-emerald-100/90">سحب مشتركين SAS</p>
                 <p className="text-lg font-bold">{sasLoginReseller.name}</p>
               </div>
               <button
@@ -3837,60 +3902,123 @@ function SettingsPage() {
             </div>
           </div>
           <div className="p-6 space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              يتم الاتصال مباشرةً بلوحة SAS من متصفحك (يتجاوز حظر Cloudflare على السيرفر). بعد تسجيل الدخول
-              يُجلب المشتركون ثم يمكنك استيرادهم إلى Wakeel.
-            </p>
+            <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 p-1 bg-gray-50 dark:bg-gray-900/40">
+              <button
+                type="button"
+                onClick={() => setSasLoginMode('token')}
+                className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+                  sasLoginMode === 'token'
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                توكن من اللوحة
+              </button>
+              <button
+                type="button"
+                onClick={() => setSasLoginMode('credentials')}
+                className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+                  sasLoginMode === 'credentials'
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                تسجيل من هنا
+              </button>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                 رابط لوحة SAS
               </label>
-              <input
-                type="url"
-                value={sasLoginBaseUrl}
-                onChange={(e) => setSasLoginBaseUrl(e.target.value)}
-                placeholder="https://ftth.jt.iq"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm font-mono"
-                dir="ltr"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                اسم المستخدم
-              </label>
-              <input
-                type="text"
-                value={sasLoginUsername}
-                onChange={(e) => setSasLoginUsername(e.target.value)}
-                placeholder="admin@mud"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-                dir="ltr"
-                autoComplete="username"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                كلمة المرور
-              </label>
-              <div className="relative">
+              <div className="flex gap-2">
                 <input
-                  type={showSasLoginPassword ? 'text' : 'password'}
-                  value={sasLoginPassword}
-                  onChange={(e) => setSasLoginPassword(e.target.value)}
-                  className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                  type="url"
+                  value={sasLoginBaseUrl}
+                  onChange={(e) => setSasLoginBaseUrl(e.target.value)}
+                  placeholder="https://ftth.jt.iq"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm font-mono"
                   dir="ltr"
-                  autoComplete="current-password"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowSasLoginPassword((v) => !v)}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400"
-                  tabIndex={-1}
+                <a
+                  href={sasLoginBaseUrl || 'https://ftth.jt.iq'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-md border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                 >
-                  {showSasLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  فتح
+                </a>
               </div>
             </div>
+
+            {sasLoginMode === 'token' ? (
+              <>
+                <ol className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5 list-decimal pr-4 leading-relaxed">
+                  <li>اضغط «فتح» وادخل إلى لوحة SAS (مثلاً ftth.jt.iq).</li>
+                  <li>سجّل دخولك من اللوحة نفسها (username / password).</li>
+                  <li>من DevTools → Network → طلب <span className="font-mono">login</span> → انسخ حقل <span className="font-mono">token</span> أو JSON كامل.</li>
+                  <li>الصقه أدناه ثم اضغط سحب المشتركين.</li>
+                </ol>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    توكن SAS (JWT أو JSON)
+                  </label>
+                  <textarea
+                    value={sasLoginTokenPaste}
+                    onChange={(e) => setSasLoginTokenPaste(e.target.value)}
+                    rows={4}
+                    placeholder='eyJ0eXAiOiJKV1Qi... أو {"status":200,"token":"..."}'
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-xs font-mono"
+                    dir="ltr"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  قد يفشل مع jt.iq (خطأ 500) لأن اللوحة تتطلب دخولاً من نفس الموقع. استخدم تبويب «توكن من اللوحة».
+                </p>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    اسم المستخدم
+                  </label>
+                  <input
+                    type="text"
+                    value={sasLoginUsername}
+                    onChange={(e) => setSasLoginUsername(e.target.value)}
+                    placeholder="admin@mud"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                    dir="ltr"
+                    autoComplete="username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    كلمة المرور
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSasLoginPassword ? 'text' : 'password'}
+                      value={sasLoginPassword}
+                      onChange={(e) => setSasLoginPassword(e.target.value)}
+                      className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                      dir="ltr"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSasLoginPassword((v) => !v)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400"
+                      tabIndex={-1}
+                    >
+                      {showSasLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
@@ -3905,7 +4033,10 @@ function SettingsPage() {
               <button
                 type="button"
                 onClick={() => void handleSasBrowserPull()}
-                disabled={!sasLoginUsername.trim() || !sasLoginPassword || !sasLoginBaseUrl.trim()}
+                disabled={
+                  !sasLoginBaseUrl.trim() ||
+                  (sasLoginMode === 'token' ? !sasLoginTokenPaste.trim() : !sasLoginUsername.trim() || !sasLoginPassword)
+                }
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-sm font-medium text-white disabled:opacity-50"
               >
                 <CloudDownload className="h-4 w-4" />
