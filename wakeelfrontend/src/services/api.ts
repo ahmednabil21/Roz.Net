@@ -1706,13 +1706,16 @@ class ApiService {
    */
   async importFtthSubscribers(
     payload: { data: unknown[] },
-    agentId?: string
+    query?: { agentId?: string; resellerId?: string }
   ): Promise<FtthSubscribersImportResponse> {
+    const params: Record<string, string> = {};
+    if (query?.agentId) params.agentId = query.agentId;
+    if (query?.resellerId) params.resellerId = query.resellerId;
     const response = await this.api.post<FtthSubscribersImportResponse>(
       '/providers/sas/ftth-subscribers-import',
       payload,
       {
-        params: agentId ? { agentId } : undefined,
+        params: Object.keys(params).length ? params : undefined,
         timeout: 600_000,
         headers: { 'Content-Type': 'application/json' },
       }
@@ -3121,6 +3124,59 @@ class ApiService {
   /** تحميل قالب Excel لتحديث أرقام الهواتف من الباكند */
   async downloadSubscriberPhonesExcelTemplate(): Promise<Blob> {
     const response = await this.api.get('/ExcelImport/template/phones', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  /** استيراد مشتركين من Excel (معرف الاشتراك، المشترك، اسم المستخدم، منطقة المشترك) مع المنطقة والرسيلر */
+  async importSubscribersRegionFromExcel(
+    file: File,
+    regionId: string,
+    resellerId: string,
+    agentId?: string
+  ): Promise<ExcelImportResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    let url = `/ExcelImport/subscribers-region?regionId=${encodeURIComponent(regionId)}&resellerId=${encodeURIComponent(resellerId)}`;
+    if (agentId) url += `&agentId=${encodeURIComponent(agentId)}`;
+
+    const response: AxiosResponse<ExcelImportResponse> = await this.api.post(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 600000,
+    });
+
+    const data = response.data;
+    const imported = data.importedCount ?? 0;
+    const updated = data.updatedCount ?? 0;
+    const successCount = data.successCount ?? imported + updated;
+    const errorCount = data.errorCount ?? 0;
+    const totalRecords = data.totalRecords ?? successCount + errorCount;
+
+    const parts: string[] = [];
+    if (imported > 0) parts.push(`استيراد ${imported}`);
+    if (updated > 0) parts.push(`تحديث ${updated}`);
+    const summary = parts.length > 0 ? parts.join(' و ') : `معالجة ${successCount}`;
+
+    return {
+      ...data,
+      success: errorCount === 0 && successCount > 0,
+      message:
+        errorCount === 0
+          ? `تم ${summary} من ${totalRecords} بنجاح`
+          : `تم ${summary} — فشل ${errorCount} من ${totalRecords}`,
+      importedCount: imported,
+      failedCount: errorCount,
+      errors: data.errorDetails
+        ? data.errorDetails.split(';').map((e) => e.trim()).filter(Boolean)
+        : undefined,
+    };
+  }
+
+  /** تحميل قالب Excel لاستيراد المشتركين (منطقة + رسيلر من الواجهة) */
+  async downloadSubscribersRegionExcelTemplate(): Promise<Blob> {
+    const response = await this.api.get('/ExcelImport/template/subscribers-region', {
       responseType: 'blob',
     });
     return response.data;

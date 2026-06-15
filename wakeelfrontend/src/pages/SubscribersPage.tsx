@@ -22,6 +22,7 @@ import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateReque
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
+import SubscriberRegionExcelImport from '../components/SubscriberRegionExcelImport';
 import Pagination from '../components/Pagination';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { 
@@ -44,7 +45,8 @@ import {
   FileText,
   Filter,
   Check,
-  Info
+  Info,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 const SUBSCRIBERS_TABLE_COLUMNS: { id: string; label: string }[] = [
@@ -231,6 +233,7 @@ const SubscribersPage: React.FC = () => {
   const [appliedExpirationFromDate, setAppliedExpirationFromDate] = useState('');
   const [appliedExpirationToDate, setAppliedExpirationToDate] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showExcelImportModal, setShowExcelImportModal] = useState(false);
   const [showRenewalModal, setShowRenewalModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -534,6 +537,7 @@ const SubscribersPage: React.FC = () => {
   const isAgentOrSubAgentOrEmployee = user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
   /** صلاحية مزامنة SAS من الاعتماديات المحفوظة (أدمن، وكيل، نائب وكيل) */
   const canSyncSas = user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent;
+  const canImportSubscribersExcel = canSyncSas;
   /** للموظف: كل إجراء يظهر فقط عند منح صلاحيته بشكل مستقل */
   const isEmployee = user?.role === UserRole.Employee;
   const showEditSubscriberAction = !isEmployee || !!user?.canEditSubscriber;
@@ -2635,6 +2639,16 @@ const SubscribersPage: React.FC = () => {
                 </button>
               )}
             </div>
+          )}
+          {canImportSubscribersExcel && (
+            <button
+              type="button"
+              onClick={() => setShowExcelImportModal(true)}
+              className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm sm:text-base transition-colors min-h-[44px] touch-manipulation"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>استيراد Excel</span>
+            </button>
           )}
           <button
             type="button"
@@ -4908,6 +4922,20 @@ const SubscribersPage: React.FC = () => {
           onSave={handleSaveNote}
         />
       )}
+
+      <SubscriberRegionExcelImport
+        open={showExcelImportModal}
+        onClose={() => setShowExcelImportModal(false)}
+        regionId={selectedOperationalRegionId}
+        resellerId={selectedOperationalResellerId}
+        regionName={myRegions.find((r) => r.id === selectedOperationalRegionId)?.name}
+        resellerName={myResellers.find((r) => r.id === selectedOperationalResellerId)?.name}
+        agentId={user?.role === UserRole.Admin ? myAgent?.id : undefined}
+        onImported={() => {
+          queryClient.invalidateQueries({ queryKey: ['subscribers'] });
+          queryClient.invalidateQueries({ queryKey: ['subscribers-dashboard'] });
+        }}
+      />
     </div>
   );
 };

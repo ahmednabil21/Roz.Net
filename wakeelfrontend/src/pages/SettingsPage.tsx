@@ -47,6 +47,7 @@ import {
   ServiceFeesCreateRequest,
   ServiceFeesUpdateRequest,
   FtthSubscribersExportBody,
+  FtthSubscribersImportResponse,
   WhatsAppDeviceStatusAdmin,
 } from '../types';
 import {
@@ -97,6 +98,17 @@ const SAS_SYNC_STEPS = [
   'جاري حساب OnlineCount...',
   'جاري إنهاء المزامنة...',
 ];
+
+function formatSubscriberImportStats(res: FtthSubscribersImportResponse): string {
+  const parts = [
+    res.imported != null && res.imported > 0 ? `جديد: ${res.imported}` : null,
+    res.updated != null && res.updated > 0 ? `تحديث: ${res.updated}` : null,
+    res.phoneUpdated != null && res.phoneUpdated > 0 ? `هاتف: ${res.phoneUpdated}` : null,
+    res.skippedDuplicate != null && res.skippedDuplicate > 0 ? `بدون تغيير: ${res.skippedDuplicate}` : null,
+    res.errors != null && res.errors > 0 ? `أخطاء: ${res.errors}` : null,
+  ].filter(Boolean);
+  return parts.join(' — ') || 'اكتملت العملية';
+}
 
 function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -746,6 +758,8 @@ function SettingsPage() {
     resellerName: string;
     data: unknown[];
     fullPayload: Record<string, unknown>;
+    /** FTTH: نتيجة الاستيراد التلقائي أثناء التصدير */
+    exportImportResult?: FtthSubscribersImportResponse;
   } | null>(null);
   const [pullImportProgress, setPullImportProgress] = useState(0);
 
@@ -944,13 +958,24 @@ function SettingsPage() {
         showError('تصدير FTTH', String(data.error));
         return;
       }
+      const exportImportResult = data.import;
       setPullExportSnapshot({
         kind: 'ftth',
         resellerId: reseller.id,
         resellerName: reseller.name,
         data: rows,
         fullPayload: { ...data } as Record<string, unknown>,
+        exportImportResult,
       });
+      if (exportImportResult) {
+        queryClient.invalidateQueries({ queryKey: ['subscribers'] });
+        const stats = formatSubscriberImportStats(exportImportResult);
+        if ((exportImportResult.errors ?? 0) > 0 && (exportImportResult.imported ?? 0) === 0) {
+          showError('تصدير FTTH', stats);
+        } else {
+          showSuccess('تم جلب وحفظ المشتركين', stats);
+        }
+      }
       setPullResultModalOpen(true);
     },
     onError: (err: unknown) => {
@@ -996,7 +1021,10 @@ function SettingsPage() {
   const importPullSubscribersMutation = useMutation({
     mutationFn: (payload: { data: unknown[]; kind: 'ftth' | 'sas'; resellerId?: string }) =>
       payload.kind === 'ftth'
-        ? apiService.importFtthSubscribers({ data: payload.data })
+        ? apiService.importFtthSubscribers(
+            { data: payload.data },
+            payload.resellerId ? { resellerId: payload.resellerId } : undefined
+          )
         : apiService.importSasSubscribers(
             { data: payload.data },
             payload.resellerId ? { resellerId: payload.resellerId } : undefined
@@ -1008,24 +1036,29 @@ function SettingsPage() {
     },
     onSuccess: (res) => {
       setPullImportProgress(100);
-      const parts = [
-        res.imported != null ? `استُورد: ${res.imported}` : null,
-        res.updated != null && res.updated > 0 ? `تحديث: ${res.updated}` : null,
-        res.skippedDuplicate != null ? `تجاهل تكرار: ${res.skippedDuplicate}` : null,
-        res.phoneUpdated != null && res.phoneUpdated > 0 ? `هاتف: ${res.phoneUpdated}` : null,
-        res.errors != null && res.errors > 0 ? `أخطاء: ${res.errors}` : null,
-      ].filter(Boolean);
+      const stats = formatSubscriberImportStats(res);
       const errDetail =
         res.errors && res.errors > 0 && res.errorMessages?.length
           ? res.errorMessages.slice(0, 3).join(' — ')
           : null;
+      const noChanges =
+        (res.imported ?? 0) === 0 &&
+        (res.updated ?? 0) === 0 &&
+        (res.phoneUpdated ?? 0) === 0 &&
+        (res.skippedDuplicate ?? 0) > 0;
       window.setTimeout(() => {
         setPullImportModalOpen(false);
         setPullExportSnapshot(null);
+        setPullResultModalOpen(false);
         if (res.errors && res.errors > 0 && (res.imported ?? 0) === 0 && (res.updated ?? 0) === 0) {
-          showError('فشل الاستيراد', errDetail || parts.join(' — ') || 'تحقق من الملف والرسيلر.');
+          showError('فشل الاستيراد', errDetail || stats || 'تحقق من الملف والرسيلر.');
+        } else if (noChanges) {
+          showSuccess(
+            'لا تغييرات جديدة',
+            'المشتركون موجودون مسبقاً ومطابقون للبيانات المجلوبة. لا حاجة لاستيراد مرة ثانية بعد التصدير.'
+          );
         } else {
-          showSuccess('تم الاستيراد', [parts.join(' — '), errDetail].filter(Boolean).join(' | ') || 'اكتملت العملية.');
+          showSuccess('تمت المزامنة', [stats, errDetail].filter(Boolean).join(' | ') || 'اكتملت العملية.');
         }
         queryClient.invalidateQueries({ queryKey: ['subscribers'] });
         setPullImportProgress(0);
@@ -4212,6 +4245,15 @@ function SettingsPage() {
                 {pullExportSnapshot.data.length}
               </p>
             </div>
+            {pullExportSnapshot.kind === 'ftth' && pullExportSnapshot.exportImportResult && (
+              <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50/90 dark:bg-green-950/30 px-4 py-3 text-sm text-green-800 dark:text-green-200 text-right">
+                <p className="font-medium mb-1">تم الحفظ تلقائياً عند الجلب</p>
+                <p>{formatSubscriberImportStats(pullExportSnapshot.exportImportResult)}</p>
+                <p className="text-xs mt-2 text-green-700/90 dark:text-green-300/90">
+                  لا حاجة لزر «استيراد» بعد التصدير — المشتركون أُدخلوا مع طلب الجلب.
+                </p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
@@ -4221,23 +4263,54 @@ function SettingsPage() {
                 <Download className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                 تحميل نسخة احتياطية
               </button>
+              {pullExportSnapshot.kind === 'sas' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!pullExportSnapshot.data.length) return;
+                    importPullSubscribersMutation.mutate({
+                      data: pullExportSnapshot.data,
+                      kind: pullExportSnapshot.kind,
+                      resellerId: pullExportSnapshot.resellerId,
+                    });
+                  }}
+                  disabled={!pullExportSnapshot.data.length || importPullSubscribersMutation.isPending}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-500 py-3 px-4 font-medium text-white shadow-lg shadow-primary-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <DatabaseIcon className="h-5 w-5" />
+                  استيراد الآن
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPullResultModalOpen(false);
+                    setPullExportSnapshot(null);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-500 py-3 px-4 font-medium text-white shadow-lg shadow-primary-900/20"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  تم — إغلاق
+                </button>
+              )}
+            </div>
+            {pullExportSnapshot.kind === 'ftth' && (
               <button
                 type="button"
                 onClick={() => {
                   if (!pullExportSnapshot.data.length) return;
                   importPullSubscribersMutation.mutate({
                     data: pullExportSnapshot.data,
-                    kind: pullExportSnapshot.kind,
+                    kind: 'ftth',
                     resellerId: pullExportSnapshot.resellerId,
                   });
                 }}
                 disabled={!pullExportSnapshot.data.length || importPullSubscribersMutation.isPending}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 hover:bg-primary-700 dark:bg-primary-600 dark:hover:bg-primary-500 py-3 px-4 font-medium text-white shadow-lg shadow-primary-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
               >
-                <DatabaseIcon className="h-5 w-5" />
-                استيراد الآن
+                إعادة مزامنة يدوياً (اختياري — عادة غير مطلوب)
               </button>
-            </div>
+            )}
           </div>
         </div>
       </div>

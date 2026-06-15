@@ -1026,6 +1026,8 @@ export interface FtthSubscribersExportResponse {
   includeAllStatuses?: boolean;
   error?: string;
   serviceFees?: ServiceFees[];
+  /** FTTH: الاستيراد يتم تلقائياً أثناء التصدير */
+  import?: FtthSubscribersImportResponse;
 }
 
 /** رد POST /providers/sas/ftth-subscribers-import */
@@ -2245,6 +2247,7 @@ export interface ExcelImportResponse {
   success: boolean;
   message: string;
   importedCount?: number;
+  updatedCount?: number;
   failedCount?: number;
   errors?: string[];
   importLogId?: string;
