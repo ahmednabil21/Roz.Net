@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +41,12 @@ const BalancePage: React.FC = () => {
     agentResellerId: '',
   });
 
+  const resellerRows = useMemo(
+    () => balanceDetail?.resellerBalances ?? [],
+    [balanceDetail?.resellerBalances]
+  );
+  const hasResellerRegions = resellerRows.length > 0;
+
   useEffect(() => {
     if (!showEditBalanceModal) return;
     if (editBalanceResellerId) {
@@ -61,9 +67,6 @@ const BalancePage: React.FC = () => {
     enabled: isAuthenticated && balanceQueryEnabled,
   });
   const topUpsList = topUpsResponse?.data ?? [];
-
-  const resellerRows = balanceDetail?.resellerBalances ?? [];
-  const hasResellerRegions = resellerRows.length > 0;
 
   const topUpMutation = useMutation({
     mutationFn: (body: BalanceTopUpRequest) => apiService.postBalanceTopUp(body),
