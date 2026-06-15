@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useDigits } from '../contexts/DigitsContext';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
+import SubscriberPhonesUpdateSection from '../components/SubscriberPhonesUpdateSection';
 import {
   getActivationMessageSettings,
   setActivationMessageSettings,
@@ -64,6 +65,7 @@ import {
   Trash2,
   Key,
   Smartphone,
+  Phone,
   Megaphone,
   Pencil,
   Store,
@@ -128,6 +130,7 @@ function SettingsPage() {
   /** الوكيل والمدير الثانوي والموظف: جلب الوكيل (للموظف/المدير الثانوي يرجع الوكيل التابع له — نفس جلسة واتساب) */
   const isAgentOrSubAgentOrEmployee = isAgentOrSubAgent || isEmployee;
   const isAdmin = user?.role === UserRole.Admin;
+  const canUpdateSubscriberPhones = isAdmin || isAgentOrSubAgent;
   const canManageServiceFees = isAdmin || isAgentOrSubAgent;
   const canViewServiceFees = canManageServiceFees || isEmployee;
 
@@ -471,7 +474,8 @@ function SettingsPage() {
     | 'sasAdminBrowserSync'
     | 'adminWhatsAppSessions'
     | 'subscriberApp'
-    | 'subscriberAnnouncement';
+    | 'subscriberAnnouncement'
+    | 'subscriberPhones';
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
 
   const {
@@ -1006,14 +1010,23 @@ function SettingsPage() {
       setPullImportProgress(100);
       const parts = [
         res.imported != null ? `استُورد: ${res.imported}` : null,
+        res.updated != null && res.updated > 0 ? `تحديث: ${res.updated}` : null,
         res.skippedDuplicate != null ? `تجاهل تكرار: ${res.skippedDuplicate}` : null,
-        res.updated != null ? `تحديث: ${res.updated}` : null,
+        res.phoneUpdated != null && res.phoneUpdated > 0 ? `هاتف: ${res.phoneUpdated}` : null,
         res.errors != null && res.errors > 0 ? `أخطاء: ${res.errors}` : null,
       ].filter(Boolean);
+      const errDetail =
+        res.errors && res.errors > 0 && res.errorMessages?.length
+          ? res.errorMessages.slice(0, 3).join(' — ')
+          : null;
       window.setTimeout(() => {
         setPullImportModalOpen(false);
         setPullExportSnapshot(null);
-        showSuccess('تم الاستيراد', parts.join(' — ') || 'اكتملت العملية.');
+        if (res.errors && res.errors > 0 && (res.imported ?? 0) === 0 && (res.updated ?? 0) === 0) {
+          showError('فشل الاستيراد', errDetail || parts.join(' — ') || 'تحقق من الملف والرسيلر.');
+        } else {
+          showSuccess('تم الاستيراد', [parts.join(' — '), errDetail].filter(Boolean).join(' | ') || 'اكتملت العملية.');
+        }
         queryClient.invalidateQueries({ queryKey: ['subscribers'] });
         setPullImportProgress(0);
       }, 900);
@@ -2233,6 +2246,10 @@ function SettingsPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {canUpdateSubscriberPhones && activeSection === 'subscriberPhones' && (
+            <SubscriberPhonesUpdateSection isAdmin={isAdmin} />
           )}
 
           {/* قالب رسالة خاصة — للوكيل/الموظف، يُرسل كما هو لأي مشترك بدون مكانات */}
@@ -3802,6 +3819,20 @@ function SettingsPage() {
                 >
                   <Megaphone className="h-5 w-5 flex-shrink-0" />
                   <span>إعلان تطبيق المشترك</span>
+                </button>
+              )}
+              {canUpdateSubscriberPhones && (
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('subscriberPhones')}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                    activeSection === 'subscriberPhones'
+                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Phone className="h-5 w-5 flex-shrink-0" />
+                  <span>تحديث أرقام المشتركين</span>
                 </button>
               )}
               {isAgentOrSubAgent && (

@@ -3083,6 +3083,49 @@ class ApiService {
     return response.data;
   }
 
+  /** تحديث أرقام هواتف المشتركين فقط من Excel (updatePhonesOnly=true) */
+  async importSubscribersPhonesFromExcel(file: File, agentId?: string): Promise<ExcelImportResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    let url = '/ExcelImport/subscribers?updatePhonesOnly=true';
+    if (agentId) url += `&agentId=${encodeURIComponent(agentId)}`;
+
+    const response: AxiosResponse<ExcelImportResponse> = await this.api.post(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 600000,
+    });
+
+    const data = response.data;
+    const successCount = data.successCount ?? 0;
+    const errorCount = data.errorCount ?? 0;
+    const totalRecords = data.totalRecords ?? successCount + errorCount;
+
+    return {
+      ...data,
+      success: errorCount === 0 && successCount > 0,
+      message:
+        errorCount === 0
+          ? `تم تحديث ${successCount} رقم هاتف بنجاح`
+          : `تم تحديث ${successCount} من ${totalRecords} — فشل ${errorCount}`,
+      importedCount: successCount,
+      failedCount: errorCount,
+      errors: data.errorDetails
+        ? data.errorDetails.split(';').map((e) => e.trim()).filter(Boolean)
+        : undefined,
+    };
+  }
+
+  /** تحميل قالب Excel لتحديث أرقام الهواتف من الباكند */
+  async downloadSubscriberPhonesExcelTemplate(): Promise<Blob> {
+    const response = await this.api.get('/ExcelImport/template/phones', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
   // System Message - GET (called when opening login page; no auth required for active message)
   async getSystemMessage(): Promise<SystemMessageResponse | null> {
     try {
