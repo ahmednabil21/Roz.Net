@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 import { apiService, ApiService } from '../services/api';
 import { fetchReceiptsWithCache } from '../services/offlineSync';
+import { showSuccess, showError } from '../utils/notifications';
 import {
   buildRegionResellerFilterParams,
   filterResellersByRegion,
@@ -28,6 +30,7 @@ import {
   FileSpreadsheet,
   Zap,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 
 const ReceiptsPage: React.FC = () => {
@@ -54,6 +57,39 @@ const ReceiptsPage: React.FC = () => {
   const [selectedOperationalResellerId, setSelectedOperationalResellerId] = useState<string>('');
   const printRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { confirmAction } = useConfirmation();
+
+  const canDeleteRenewal =
+    user?.role === UserRole.Admin ||
+    user?.role === UserRole.Agent ||
+    user?.role === UserRole.SubAgent;
+
+  const deleteRenewalMutation = useMutation({
+    mutationFn: (renewalId: string) => apiService.deleteRenewal(renewalId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['renewal-receipts'] });
+      queryClient.invalidateQueries({ queryKey: ['subscribers'] });
+      queryClient.invalidateQueries({ queryKey: ['subscribers-dashboard'] });
+      showSuccess('تم الحذف', 'تم حذف التفعيل بنجاح');
+    },
+    onError: (err: unknown) => {
+      showError('فشل الحذف', ApiService.showError(err));
+    },
+  });
+
+  const handleDeleteRenewal = async (receipt: RenewalReceipt) => {
+    const renewalId = receipt.renewalId || receipt.id;
+    if (!renewalId) {
+      showError('خطأ', 'معرف التفعيل غير متوفر');
+      return;
+    }
+    const ok = await confirmAction(
+      'حذف التفعيل',
+      `هل تريد حذف تفعيل ${receipt.subscriberName || receipt.receiptNumber || renewalId}؟ لا يمكن التراجع.`
+    );
+    if (!ok) return;
+    deleteRenewalMutation.mutate(renewalId);
+  };
 
   const isAgentOrSubAgentOrEmployee =
     user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
@@ -908,6 +944,17 @@ const ReceiptsPage: React.FC = () => {
                         >
                           <Printer className="h-4 w-4" />
                         </button>
+                        {canDeleteRenewal && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRenewal(receipt)}
+                            disabled={deleteRenewalMutation.isPending}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50"
+                            title="حذف التفعيل"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

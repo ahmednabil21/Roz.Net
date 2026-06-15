@@ -32,6 +32,7 @@ const BalancePage: React.FC = () => {
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [showEditBalanceModal, setShowEditBalanceModal] = useState(false);
   const [editBalanceValue, setEditBalanceValue] = useState<number>(0);
+  const [editBalanceResellerId, setEditBalanceResellerId] = useState('');
   const [topUpForm, setTopUpForm] = useState<BalanceTopUpRequest & { topUpDate: string }>({
     amountIqd: 0,
     recipientName: '',
@@ -39,6 +40,16 @@ const BalancePage: React.FC = () => {
     topUpDate: new Date().toISOString().split('T')[0],
     agentResellerId: '',
   });
+
+  useEffect(() => {
+    if (!showEditBalanceModal) return;
+    if (editBalanceResellerId) {
+      const row = resellerRows.find((r) => r.id === editBalanceResellerId);
+      setEditBalanceValue(row?.balanceIqd ?? 0);
+    } else {
+      setEditBalanceValue(balanceDetail?.agentPoolBalanceIqd ?? balanceTotal);
+    }
+  }, [showEditBalanceModal, editBalanceResellerId, resellerRows, balanceDetail?.agentPoolBalanceIqd, balanceTotal]);
 
   useEffect(() => {
     setEditBalanceValue(balanceDetail?.agentPoolBalanceIqd ?? balanceTotal);
@@ -77,9 +88,13 @@ const BalancePage: React.FC = () => {
   });
 
   const editBalanceMutation = useMutation({
-    mutationFn: (balanceIqd: number) => apiService.putBalance(balanceIqd),
+    mutationFn: async ({ balanceIqd, resellerId }: { balanceIqd: number; resellerId?: string }) => {
+      if (resellerId) return apiService.putResellerBalance(resellerId, balanceIqd);
+      return apiService.putBalance(balanceIqd);
+    },
     onSuccess: (data) => {
       setShowEditBalanceModal(false);
+      setEditBalanceResellerId('');
       queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
       showSuccess('تم التعديل', `الرصيد الإجمالي: ${formatNumber(data.balanceIqd, { suffix: ' د.ع' })}`);
     },
@@ -197,7 +212,10 @@ const BalancePage: React.FC = () => {
             {(user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent) && (
               <button
                 type="button"
-                onClick={() => setShowEditBalanceModal(true)}
+                onClick={() => {
+                  setEditBalanceResellerId('');
+                  setShowEditBalanceModal(true);
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium"
               >
                 <Wallet className="h-4 w-4" />
@@ -285,15 +303,40 @@ const BalancePage: React.FC = () => {
                   showError('خطأ', 'يرجى إدخال رصيد صحيح (>= 0).');
                   return;
                 }
-                editBalanceMutation.mutate(v);
+                if (hasResellerRegions && editBalanceResellerId) {
+                  editBalanceMutation.mutate({ balanceIqd: v, resellerId: editBalanceResellerId });
+                } else {
+                  editBalanceMutation.mutate({ balanceIqd: v });
+                }
               }}
               className="p-4 space-y-4"
             >
+              {hasResellerRegions && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرسيلر / الرصيد</label>
+                  <select
+                    value={editBalanceResellerId}
+                    onChange={(e) => setEditBalanceResellerId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">الرصيد العام (بدون منطقة)</option>
+                    {resellerRows.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                يُعدّل <strong className="text-gray-700 dark:text-gray-300">الرصيد العام</strong> فقط. أرصدة المناطق تُعبأ من «تعبئة الرصيد» مع اختيار المنطقة.
+                {hasResellerRegions
+                  ? 'اختر الرسيلر لتعديل رصيده، أو «الرصيد العام» لتعديل الرصيد القديم غير المربوط بمنطقة.'
+                  : 'يُعدّل الرصيد العام للوكيل.'}
               </p>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرصيد العام (د.ع)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  الرصيد (د.ع)
+                </label>
                 <input
                   type="number"
                   min={0}

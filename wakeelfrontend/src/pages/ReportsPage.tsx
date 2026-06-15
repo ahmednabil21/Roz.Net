@@ -84,7 +84,7 @@ function activationPaymentMethodLabel(pm?: number | null): string {
   return '—';
 }
 
-const LEDGER_TABLE_COLS = 15;
+const LEDGER_TABLE_COLS = 16;
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
   kind: 'Renewal';
@@ -95,6 +95,7 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   serviceFeesAmount?: number;
   totalProfit?: number;
   returnPrice?: number;
+  nationalSubscriptionCost?: number;
   agentResellerId?: string;
 } {
   return row.kind === 'Renewal';
@@ -672,7 +673,8 @@ const ReportsPage: React.FC = () => {
                         <th>يوزر المشترك</th>
                         <th>الباقة</th>
                         <th>طريقة الدفع</th>
-                        <th>كلفة الاشتراك</th>
+                        <th>كلفة اشتراك الوكيل</th>
+                        <th>كلفة اشتراك الوطني</th>
                         <th>ربح الاجور</th>
                         <th>الربح</th>
                         <th>مبلغ الكاشباك</th>
@@ -720,7 +722,14 @@ const ReportsPage: React.FC = () => {
                                 {renewal ? activationPaymentMethodLabel(renewal.paymentMethod) : '—'}
                               </td>
                               <td className="whitespace-nowrap font-medium">
-                                {formatNumber(row.amount ?? 0, { suffix: ' د.ع' })}
+                                {renewal
+                                  ? formatNumber(row.amount ?? 0, { suffix: ' د.ع' })
+                                  : formatNumber(row.amount ?? 0, { suffix: ' د.ع' })}
+                              </td>
+                              <td className="whitespace-nowrap font-medium">
+                                {renewal?.nationalSubscriptionCost != null
+                                  ? formatNumber(renewal.nationalSubscriptionCost, { suffix: ' د.ع' })
+                                  : '—'}
                               </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.serviceFeesAmount != null

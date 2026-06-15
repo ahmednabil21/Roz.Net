@@ -2358,6 +2358,8 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   totalProfit?: number;
   /** مبلغ الكاشباك */
   returnPrice?: number;
+  /** كلفة اشتراك الوطني (SalePrice) */
+  nationalSubscriptionCost?: number;
   notes?: string | null;
   subscriberNoteType?: SubscriberNoteType | number | null;
   note?: string | null;

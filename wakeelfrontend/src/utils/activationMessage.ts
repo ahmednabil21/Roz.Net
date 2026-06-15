@@ -25,6 +25,9 @@ export const PLACEHOLDERS = [
   { key: 'AgentCompanyName', label: 'اسم الشركة', token: '{{AgentCompanyName}}' },
   { key: 'DebtDueDate', label: 'تاريخ التسديد', token: '{{DebtDueDate}}' },
   { key: 'DebtAmount', label: 'المبلغ الدين', token: '{{DebtAmount}}' },
+  { key: 'TotalAmount', label: 'المبلغ الكلي', token: '{{TotalAmount}}' },
+  { key: 'SubscriptionAmount', label: 'مبلغ الاشتراك', token: '{{SubscriptionAmount}}' },
+  { key: 'ServiceFeesAmount', label: 'مبلغ الأجور', token: '{{ServiceFeesAmount}}' },
 ] as const;
 
 export interface ActivationMessageData {
@@ -33,6 +36,9 @@ export interface ActivationMessageData {
   activationDate: string;
   expirationDate: string;
   companyName: string;
+  totalAmount?: string;
+  subscriptionAmount?: string;
+  serviceFeesAmount?: string;
 }
 
 const defaultSettings: ActivationMessageSettings = {
@@ -85,6 +91,14 @@ export function buildActivationMessageFromTemplate(
   out = out.replace(/\{\{companyName\}\}/gi, data.companyName);
   out = out.replace(/\{\{CompanyName\}\}/g, data.companyName);
   out = out.replace(/\{\{AgentCompanyName\}\}/g, data.companyName);
+  out = out.replace(/\{\{DebtAmount\}\}/g, '0');
+  out = out.replace(/\{\{debtAmount\}\}/gi, '0');
+  out = out.replace(/\{\{TotalAmount\}\}/g, data.totalAmount ?? '0');
+  out = out.replace(/\{\{totalAmount\}\}/gi, data.totalAmount ?? '0');
+  out = out.replace(/\{\{SubscriptionAmount\}\}/g, data.subscriptionAmount ?? '0');
+  out = out.replace(/\{\{subscriptionAmount\}\}/gi, data.subscriptionAmount ?? '0');
+  out = out.replace(/\{\{ServiceFeesAmount\}\}/g, data.serviceFeesAmount ?? '0');
+  out = out.replace(/\{\{serviceFeesAmount\}\}/gi, data.serviceFeesAmount ?? '0');
   out = out.replace(/\{\{customText\}\}/gi, customText);
   out = out.replace(/\{\{CustomText\}\}/g, customText);
   return out;
