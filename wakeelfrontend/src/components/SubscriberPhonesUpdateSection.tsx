@@ -193,7 +193,7 @@ const SubscriberPhonesUpdateSection: React.FC<Props> = ({ isAdmin }) => {
         </div>
 
         <div className="rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-900/40 p-5 space-y-4">
-          <h3 className="font-medium text-gray-900 dark:text-white">ترتيب الأعمدة (من الباكند)</h3>
+          <h3 className="font-medium text-gray-900 dark:text-white">ترتيب الأعمدة المطلوبة</h3>
           <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5">
             <li><strong>1 — Username</strong> (مطلوب) — اسم مستخدم المشترك</li>
             <li><strong>2 — FirstName</strong> — الاسم الأول</li>
@@ -201,9 +201,7 @@ const SubscriberPhonesUpdateSection: React.FC<Props> = ({ isAdmin }) => {
             <li className="text-gray-400">4–7 — غير مستخدمة (اتركها فارغة)</li>
             <li><strong>8 — Phone</strong> (مطلوب) — رقم الهاتف الجديد</li>
           </ul>
-          <p className="text-xs text-amber-700 dark:text-amber-300">
-            النظام يقرأ الأعمدة حسب الترتيب وليس حسب اسم العنوان. إذا لم يوجد عمود LastName في الصف الأول، يُقرأ Phone من العمود 7.
-          </p>
+      
           <button
             type="button"
             onClick={handleDownloadTemplate}
@@ -215,7 +213,7 @@ const SubscriberPhonesUpdateSection: React.FC<Props> = ({ isAdmin }) => {
             ) : (
               <Download className="h-4 w-4" />
             )}
-            تحميل قالب Excel من الباكند
+            تحميل قالب Excel
           </button>
         </div>
       </div>
