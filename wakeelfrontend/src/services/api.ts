@@ -3410,6 +3410,7 @@ class ApiService {
     regionId?: string;
     days?: number;
     agentId?: string;
+    partnerId?: string;
   }): Promise<import('../types').FtthSubscriptionsCompareResponse> {
     const query: Record<string, string> = {};
     if (params.agentId) query.agentId = params.agentId;
@@ -3419,6 +3420,7 @@ class ApiService {
         resellerId: params.resellerId,
         regionId: params.regionId || undefined,
         days: params.days ?? 7,
+        partnerId: params.partnerId?.trim() || undefined,
       },
       { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );

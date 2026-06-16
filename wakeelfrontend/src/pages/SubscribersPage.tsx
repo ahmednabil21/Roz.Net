@@ -91,6 +91,10 @@ function ftthCompareRowHasMismatch(row: FtthSubscriptionsCompareItem): boolean {
   return !!(localAct && ftthAct && localAct !== ftthAct);
 }
 
+function resolveFtthPartnerId(resellers: AgentReseller[], resellerId: string): string {
+  return resellers.find((r) => r.id === resellerId)?.ftthPartnerId?.trim() ?? '';
+}
+
 // (SAS Python activation) تم تعليقها مؤقتاً — لا يتم تنفيذ أي منطق هنا حالياً.
 
 const STORAGE_KEY_VISIBLE_COLUMNS = 'wakeel_subscribers_visible_columns';
@@ -308,6 +312,7 @@ const SubscribersPage: React.FC = () => {
   const [ftthCompareResult, setFtthCompareResult] = useState<FtthSubscriptionsCompareResponse | null>(null);
   const [ftthCompareRegionId, setFtthCompareRegionId] = useState('');
   const [ftthCompareResellerId, setFtthCompareResellerId] = useState('');
+  const [ftthComparePartnerId, setFtthComparePartnerId] = useState('');
   const [ftthCompareDays, setFtthCompareDays] = useState(7);
   const [autoSyncSaveServiceFeesId, setAutoSyncSaveServiceFeesId] = useState('');
   const [autoSyncSaveServiceFeesPrice, setAutoSyncSaveServiceFeesPrice] = useState<number | undefined>(undefined);
@@ -901,6 +906,7 @@ const SubscribersPage: React.FC = () => {
         resellerId: ftthCompareResellerId,
         regionId: ftthCompareRegionId || undefined,
         days: ftthCompareDays,
+        partnerId: ftthComparePartnerId.trim(),
         agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
       });
     },
@@ -932,6 +938,7 @@ const SubscribersPage: React.FC = () => {
         '');
     setFtthCompareRegionId(regionId);
     setFtthCompareResellerId(resellerId);
+    setFtthComparePartnerId(resolveFtthPartnerId(ftthResellersForCompare, resellerId));
     setFtthCompareDays(7);
     setShowFtthCompareFormModal(true);
   };
@@ -4652,7 +4659,7 @@ const SubscribersPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">مزامنة FTTH — مقارنة الاشتراكات</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              اختر المنطقة والرسيلر وعدد الأيام. باقي البيانات (agentId، partnerId، zone) تُملأ تلقائياً.
+              اختر المنطقة والرسيلر وعدد الأيام. أدخل معرف الشريك FTTH (partnerId) — يُملأ تلقائياً من الرسيلر إن وُجد ويمكن تعديله.
             </p>
             <div className="space-y-4">
               {myRegions.length > 0 && (
@@ -4664,9 +4671,11 @@ const SubscribersPage: React.FC = () => {
                       const nextRegion = e.target.value;
                       setFtthCompareRegionId(nextRegion);
                       const nextResellers = filterResellersByRegion(ftthResellersForCompare, nextRegion);
-                      setFtthCompareResellerId((prev) =>
-                        nextResellers.some((r) => r.id === prev) ? prev : nextResellers[0]?.id ?? ''
-                      );
+                      setFtthCompareResellerId((prev) => {
+                        const nextId = nextResellers.some((r) => r.id === prev) ? prev : nextResellers[0]?.id ?? '';
+                        setFtthComparePartnerId(resolveFtthPartnerId(ftthResellersForCompare, nextId));
+                        return nextId;
+                      });
                     }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                   >
@@ -4683,7 +4692,11 @@ const SubscribersPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الرسيلر</label>
                 <select
                   value={ftthCompareResellerId}
-                  onChange={(e) => setFtthCompareResellerId(e.target.value)}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setFtthCompareResellerId(nextId);
+                    setFtthComparePartnerId(resolveFtthPartnerId(ftthResellersForCompare, nextId));
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 >
                   <option value="">اختر الرسيلر</option>
@@ -4694,6 +4707,19 @@ const SubscribersPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  معرف الشريك FTTH (partnerId)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={ftthComparePartnerId}
+                  onChange={(e) => setFtthComparePartnerId(e.target.value)}
+                  placeholder="مثال: 2864647"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">عدد الأيام</label>
@@ -4720,7 +4746,7 @@ const SubscribersPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                disabled={!ftthCompareResellerId || ftthCompareMutation.isPending}
+                disabled={!ftthCompareResellerId || !ftthComparePartnerId.trim() || ftthCompareMutation.isPending}
                 onClick={() => ftthCompareMutation.mutate()}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-60"
               >

@@ -1000,6 +1000,8 @@ export interface AgentReseller {
   telegramChatId?: string | null;
   /** كلمة مرور الرسيلر — تُرجَع من GET /Agents/me/resellers لاستخدامها في تفعيل SAS عبر سكربت البايثون */
   password?: string | null;
+  /** معرف الشريك في FTTH (partnerId) لسحب المعاملات والمقارنة */
+  ftthPartnerId?: string | null;
   displayOrder: number;
   /** رصيد التفعيل لهذه المنطقة (من الباكند) */
   balanceIqd?: number;
