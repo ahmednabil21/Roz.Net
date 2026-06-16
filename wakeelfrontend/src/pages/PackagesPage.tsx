@@ -27,7 +27,7 @@ import {
 const PAGE_SIZE_OPTIONS = [6, 12, 24, 48];
 
 function computeReturnPrice(originalPrice: number, salePrice: number): number {
-  return Math.round((Number(originalPrice) - Number(salePrice)) * 100) / 100;
+  return Math.max(0, Math.round((Number(originalPrice) - Number(salePrice)) * 100) / 100);
 }
 
 const PackagesPage: React.FC = () => {
