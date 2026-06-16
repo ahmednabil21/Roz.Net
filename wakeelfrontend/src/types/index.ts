@@ -2437,8 +2437,10 @@ export interface AccountsSubscriberNoteTypeOption {
 export interface AccountsResponse {
   amountPaid: number;
   extension: { count: number };
-  /** مجموع وارد تسديد الديون ضمن الفترة */
-  totalDebtIncome?: number;
+  /** تسديدات ديون الاشتراك الواصلة */
+  totalPaidSubscriptionDebt?: number;
+  /** ديون الاشتراك غير الواصلة (آجل / غير واصل) */
+  totalUnpaidSubscriptionDebt?: number;
   totalActivationProfit: number;
   /** مجموع الوارد الكلي = مبلغ الباقة + الأجور + تسديد الديون */
   totalGeneralIncome?: number;
@@ -2446,7 +2448,7 @@ export interface AccountsResponse {
   totalPackageIncome?: number;
   /** مجموع وارد كلفة الوكيل */
   totalAgentPackageIncome?: number;
-  /** مجموع وارد الأجور */
+  /** مجموع وارد الأجور (واصل عند التفعيل + تسديد ديون الأجور) */
   totalServiceFeesIncome?: number;
   /** مجموع ديون أجور الخدمة غير الواصلة */
   totalServiceFeesDebt?: number;

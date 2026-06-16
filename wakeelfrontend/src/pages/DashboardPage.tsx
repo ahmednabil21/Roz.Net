@@ -391,7 +391,7 @@ const DashboardPage: React.FC = () => {
   const transferProfitEstimate = useMemo(() => {
     const amountPaid = accountsSummary?.amountPaid ?? 0;
     const activationProfit = accountsSummary?.totalActivationProfit ?? 0;
-    const debtPaid = accountsSummary?.totalDebtIncome ?? 0;
+    const debtPaid = accountsSummary?.totalPaidSubscriptionDebt ?? 0;
     const totalReceived = amountPaid + debtPaid;
     return Math.max(0, totalReceived - amountPaid - activationProfit - debtPaid);
   }, [accountsSummary]);

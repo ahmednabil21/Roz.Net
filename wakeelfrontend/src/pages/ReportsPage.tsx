@@ -634,10 +634,18 @@ const ReportsPage: React.FC = () => {
               glass
             />
             <StatCard
-              title="وارد الديون"
-              value={accounts?.totalDebtIncome ?? 0}
+              title="ديون اشتراك واصلة"
+              value={accounts?.totalPaidSubscriptionDebt ?? 0}
               icon={CreditCard}
               color="purple"
+              isAmount
+              glass
+            />
+            <StatCard
+              title="ديون اشتراك غير واصلة"
+              value={accounts?.totalUnpaidSubscriptionDebt ?? 0}
+              icon={CreditCard}
+              color="red"
               isAmount
               glass
             />
