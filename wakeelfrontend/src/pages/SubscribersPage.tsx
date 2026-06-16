@@ -87,13 +87,10 @@ function ftthCompareDateToInput(date: string | null | undefined): string | undef
 }
 
 function ftthCompareRowHasMismatch(row: FtthSubscriptionsCompareItem): boolean {
-  if (row.isNewSubscriber || !row.localExpiration) return true;
+  if (!row.localExpiration) return true;
   const localExp = normalizeCompareDate(row.localExpiration);
   const ftthExp = normalizeCompareDate(row.ftthExpiration);
-  if (localExp && ftthExp && localExp !== ftthExp) return true;
-  const localAct = normalizeCompareDate(row.localActivation);
-  const ftthAct = normalizeCompareDate(row.ftthActivation);
-  return !!(localAct && ftthAct && localAct !== ftthAct);
+  return !!(localExp && ftthExp && localExp !== ftthExp);
 }
 
 function resolveFtthPartnerId(resellers: AgentReseller[], resellerId: string): string {
@@ -930,7 +927,7 @@ const SubscribersPage: React.FC = () => {
           : !(prev.debtDescription || '').trim()
             ? `الباقي من المبلغ: ${formatNumber(calculatedRemaining, { suffix: ' د.ع' })}`
             : (prev.debtDescription ?? ''),
-      debtDueDate: isExtension || calculatedRemaining === 0 ? '' : prev.debtDueDate || new Date().toISOString().split('T')[0],
+      debtDueDate: isExtension || calculatedRemaining === 0 ? '' : prev.debtDueDate || '',
     }));
   }, [renewalData.newProfileId, renewalInfo?.availableProfiles, renewalAmountFullyReceived, formatNumber]);
 
@@ -1707,7 +1704,7 @@ const SubscribersPage: React.FC = () => {
       amountPaid: 0,
       remainingAmount: remaining,
       debtDescription: remaining > 0 ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}` : '',
-      debtDueDate: remaining > 0 ? new Date().toISOString().split('T')[0] : '',
+      debtDueDate: '',
       paymentStatus: PaymentStatus.Unpaid,
     };
   };
@@ -1755,7 +1752,6 @@ const SubscribersPage: React.FC = () => {
     if (!selectedProfile) return;
     const salePrice = selectedProfile.salePrice || 0;
     setRenewalAmountFullyReceived(false);
-    setActivationServiceFeesEnabled({});
     setRenewalData((prev) => ({
       ...prev,
       activationChannel: RenewalActivationChannel.Normal,
@@ -1826,9 +1822,6 @@ const SubscribersPage: React.FC = () => {
             if (!(updated.debtDescription || '').trim()) {
               updated.debtDescription = `الباقي من المبلغ: ${formatNumber(calculatedRemaining, { suffix: ' د.ع' })}`;
             }
-            if (!(updated.debtDueDate || '').toString().trim()) {
-              updated.debtDueDate = new Date().toISOString().split('T')[0];
-            }
           } else {
             updated.debtDescription = '';
             updated.debtDueDate = '';
@@ -1851,34 +1844,16 @@ const SubscribersPage: React.FC = () => {
     const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
     const isCustomerWallet =
       (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
-    const serviceFeesAsDebt = !isDeferred && hasActivationServiceFeesDebt;
 
-    if (!isExtension && !isCustomerWallet && (renewalData.remainingAmount || 0) > 0) {
-      const due = (renewalData.debtDueDate || '').toString().trim();
-      if (!due) {
-        showError('خطأ', 'يرجى اختيار تاريخ تسديد الدين عند وجود مبلغ متبقي.');
-        return;
-      }
-    }
-    if (!isExtension && serviceFeesAsDebt) {
-      const due = (renewalData.debtDueDate || '').toString().trim();
-      if (!due) {
-        showError('خطأ', 'يرجى اختيار تاريخ تسديد الدين عند تسجيل أجور الخدمة كدين.');
-        return;
-      }
-    }
-
-    const serviceFeesItems = isDeferred
-      ? []
-      : enabledActivationServiceFees.map((fee) => {
-          const price = fee.price ?? 0;
-          const fullyPaid = isActivationServiceFeeFullyPaid(fee.id);
-          return {
-            serviceFeesId: fee.id,
-            serviceFeesPrice: price,
-            serviceFeesAmountPaid: fullyPaid ? price : 0,
-          };
-        });
+    const serviceFeesItems = enabledActivationServiceFees.map((fee) => {
+      const price = fee.price ?? 0;
+      const fullyPaid = isActivationServiceFeeFullyPaid(fee.id);
+      return {
+        serviceFeesId: fee.id,
+        serviceFeesPrice: price,
+        serviceFeesAmountPaid: isDeferred || !fullyPaid ? 0 : price,
+      };
+    });
     const firstServiceFee = serviceFeesItems[0];
 
     const enhancedRenewalData: RenewalData = {
@@ -4074,16 +4049,21 @@ const SubscribersPage: React.FC = () => {
                   !isDeferredPayment &&
                   !renewalAmountFullyReceived &&
                   (renewalData.remainingAmount || 0) > 0;
+                const hasDeferredSubscriptionDebt =
+                  !isExtensionForDebt && isDeferredPayment && (renewalData.remainingAmount || 0) > 0;
                 const hasServiceFeesDebt =
                   !isExtensionForDebt &&
-                  !isDeferredPayment &&
-                  hasActivationServiceFeesDebt;
-                if (!renewalData.newProfileId || (!hasSubscriptionDebt && !hasServiceFeesDebt)) {
+                  !isCustomerWalletChannel &&
+                  ((isDeferredPayment && enabledActivationServiceFees.length > 0) ||
+                    hasActivationServiceFeesDebt);
+                const showDebtSection =
+                  hasSubscriptionDebt || hasDeferredSubscriptionDebt || hasServiceFeesDebt;
+                if (!renewalData.newProfileId || !showDebtSection) {
                   return null;
                 }
                 return (
                   <>
-                    {hasSubscriptionDebt && (
+                    {(hasSubscriptionDebt || hasDeferredSubscriptionDebt) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -4119,34 +4099,28 @@ const SubscribersPage: React.FC = () => {
                       <p className="text-sm text-amber-700 dark:text-amber-300">
                         دين أجور الخدمة:{' '}
                         <span className="font-semibold tabular-nums">
-                          {formatNumber(activationServiceFeesDebtTotal, { suffix: ' د.ع' })}
+                          {formatNumber(
+                            isDeferredPayment ? activationServiceFeesTotal : activationServiceFeesDebtTotal,
+                            { suffix: ' د.ع' }
+                          )}
                         </span>
                       </p>
                     )}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        تاريخ تسديد الدين *
-                      </label>
-                      <input
-                        type="date"
-                        name="debtDueDate"
-                        value={renewalData.debtDueDate || ''}
-                        onChange={handleRenewalInputChange}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                      />
-                    </div>
                   </>
                 );
               })()}
 
               {/* أجور الخدمة */}
-              {activationServiceFeesList.length > 0 &&
-                renewalData.activationPaymentMethod !== ActivationPaymentMethod.Deferred && (
+              {activationServiceFeesList.length > 0 && (
                 <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">أجور الخدمة</h3>
                   <div className="space-y-2">
                     {activationServiceFeesList.map((fee) => {
+                      const isDeferredFee =
+                        renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+                      const isCustomerWalletFee =
+                        (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                        RenewalActivationChannel.CustomerWallet;
                       const isEnabled = activationServiceFeesEnabled[fee.id] !== false;
                       const feeFullyPaid = isActivationServiceFeeFullyPaid(fee.id);
                       const feePrice = fee.price ?? 0;
@@ -4161,9 +4135,11 @@ const SubscribersPage: React.FC = () => {
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 tabular-nums">
                                 {formatNumber(feePrice, { suffix: ' د.ع' })}
                                 {isEnabled
-                                  ? feeFullyPaid
-                                    ? ' — مفعّل (واصل)'
-                                    : ' — مفعّل (دين)'
+                                  ? isDeferredFee
+                                    ? ' — مفعّل (دين — آجل)'
+                                    : feeFullyPaid
+                                      ? ' — مفعّل (واصل)'
+                                      : ' — مفعّل (دين)'
                                   : ' — غير مفعّل'}
                               </p>
                             </div>
@@ -4197,14 +4173,21 @@ const SubscribersPage: React.FC = () => {
                               />
                             </button>
                           </div>
-                          {isEnabled && (
+                          {isEnabled && isDeferredFee && (
+                            <p className="text-xs text-amber-700 dark:text-amber-300 px-1">
+                              طريقة الدفع آجل — يُسجَّل هذا الأجر كدين على المشترك
+                            </p>
+                          )}
+                          {isEnabled && !isDeferredFee && (
                             <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2.5">
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">حالة الأجر</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                   {feeFullyPaid
                                     ? 'واصل — يُحفظ في الحسابات'
-                                    : 'غير واصل — يُسجَّل كدين على المشترك'}
+                                    : isCustomerWalletFee
+                                      ? 'غير واصل — دين أجور على المشترك'
+                                      : 'غير واصل — يُسجَّل كدين على المشترك'}
                                 </p>
                               </div>
                               <button
@@ -4213,18 +4196,10 @@ const SubscribersPage: React.FC = () => {
                                 aria-checked={feeFullyPaid}
                                 aria-label={`واصل ${fee.name}`}
                                 onClick={() => {
-                                  const nextFullyPaid = !feeFullyPaid;
                                   setActivationServiceFeesFullyPaid((prev) => ({
                                     ...prev,
-                                    [fee.id]: nextFullyPaid,
+                                    [fee.id]: !feeFullyPaid,
                                   }));
-                                  if (!nextFullyPaid) {
-                                    setRenewalData((prev) => ({
-                                      ...prev,
-                                      debtDueDate:
-                                        prev.debtDueDate || new Date().toISOString().split('T')[0],
-                                    }));
-                                  }
                                 }}
                                 className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
                                   feeFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
@@ -4255,6 +4230,17 @@ const SubscribersPage: React.FC = () => {
                           {formatNumber(activationServiceFeesTotal, { suffix: ' د.ع' })}
                         </span>
                       </div>
+                      {(renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                        RenewalActivationChannel.CustomerWallet &&
+                        activationServiceFeesDebtTotal > 0 && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          دين أجور غير واصل:{' '}
+                          <span className="font-semibold tabular-nums">
+                            {formatNumber(activationServiceFeesDebtTotal, { suffix: ' د.ع' })}
+                          </span>
+                          {' '}— يُحفظ كدين على المشترك
+                        </p>
+                      )}
                       <div className="flex flex-wrap items-center justify-between gap-2 text-base font-bold pt-2 mt-1 border-t border-primary-200/70 dark:border-primary-800/70">
                         <span className="text-gray-900 dark:text-white">إجمالي الفاتورة:</span>
                         <span className="text-primary-700 dark:text-primary-300 tabular-nums">
@@ -5221,17 +5207,17 @@ const SubscribersPage: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top whitespace-normal break-words">{row.createdBy || '—'}</td>
                           <td className="px-4 py-3">
-                            {row.isNewSubscriber ? (
+                            {!mismatch ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                                متطابق
+                              </span>
+                            ) : row.isNewSubscriber ? (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
                                 مشترك جديد
                               </span>
-                            ) : mismatch ? (
+                            ) : (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                                 اختلاف تواريخ
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-                                متطابق
                               </span>
                             )}
                           </td>
