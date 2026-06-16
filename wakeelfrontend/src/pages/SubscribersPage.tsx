@@ -206,6 +206,8 @@ const FTTH_COMPARE_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
 const DEFAULT_FTTH_COMPARE_PARTNER_ID = '2864647';
 
 const FTTH_COMPARE_PAYMENT_BADGE_STYLES: Record<string, string> = {
+  'مشترك جديد':
+    'bg-green-100 text-green-700 dark:bg-green-900/45 dark:text-green-200 ring-1 ring-green-400/50',
   'محفظة الوكيل':
     'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-200 ring-1 ring-emerald-400/50',
   'محفظة المشترك او تطبيق الوطني':
@@ -455,10 +457,10 @@ const SubscribersPage: React.FC = () => {
     activationPaymentMethod: ActivationPaymentMethod.Cash,
     activationChannel: RenewalActivationChannel.Normal,
   });
-  /** مفعّل = تُضاف أجور الخدمة للفاتورة */
+  /** مفعّل = تُضاف أجور الخدمة للفاتورة؛ مطفأ = لا يُحسب ولا يُسجَّل دين */
   const [activationServiceFeesEnabled, setActivationServiceFeesEnabled] = useState<Record<string, boolean>>({});
-  /** واصل أجور الخدمة — عند ماستر/محفظة الزبون: غير واصل = يُسجَّل كدين */
-  const [activationServiceFeesFullyPaid, setActivationServiceFeesFullyPaid] = useState(true);
+  /** واصل/غير واصل لكل أجر مفعّل — غير واصل = يُسجَّل كدين على المشترك */
+  const [activationServiceFeesFullyPaid, setActivationServiceFeesFullyPaid] = useState<Record<string, boolean>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
@@ -552,6 +554,21 @@ const SubscribersPage: React.FC = () => {
     () => enabledActivationServiceFees.reduce((sum, f) => sum + (f.price ?? 0), 0),
     [enabledActivationServiceFees]
   );
+
+  const isActivationServiceFeeFullyPaid = React.useCallback(
+    (feeId: string) => activationServiceFeesFullyPaid[feeId] !== false,
+    [activationServiceFeesFullyPaid]
+  );
+
+  const activationServiceFeesDebtTotal = React.useMemo(
+    () =>
+      enabledActivationServiceFees
+        .filter((f) => !isActivationServiceFeeFullyPaid(f.id))
+        .reduce((sum, f) => sum + (f.price ?? 0), 0),
+    [enabledActivationServiceFees, isActivationServiceFeeFullyPaid]
+  );
+
+  const hasActivationServiceFeesDebt = activationServiceFeesDebtTotal > 0;
 
   const effectiveSyncServiceFeesList = React.useMemo(
     () => (syncServiceFeesList.length > 0 ? syncServiceFeesList : activationServiceFeesList),
@@ -844,6 +861,17 @@ const SubscribersPage: React.FC = () => {
       }
       return changed ? next : prev;
     });
+    setActivationServiceFeesFullyPaid((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const fee of activationServiceFeesList) {
+        if (next[fee.id] === undefined) {
+          next[fee.id] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [showRenewalModal, activationServiceFeesList]);
 
   useEffect(() => {
@@ -869,10 +897,9 @@ const SubscribersPage: React.FC = () => {
     if (!showRenewalModal) {
       renewalProfileIdForAmountSyncRef.current = '';
       setActivationServiceFeesEnabled({});
-      setActivationServiceFeesFullyPaid(true);
+      setActivationServiceFeesFullyPaid({});
     } else {
       setRenewalAmountFullyReceived(true);
-      setActivationServiceFeesFullyPaid(true);
     }
   }, [showRenewalModal]);
 
@@ -1702,7 +1729,6 @@ const SubscribersPage: React.FC = () => {
     const salePrice = selectedProfile?.salePrice || 0;
     if (channel === RenewalActivationChannel.CustomerWallet) {
       setRenewalAmountFullyReceived(true);
-      setActivationServiceFeesFullyPaid(false);
       setRenewalData((prev) => ({
         ...prev,
         activationChannel: channel,
@@ -1823,14 +1849,9 @@ const SubscribersPage: React.FC = () => {
     const selectedProfile = renewalInfo?.availableProfiles?.find(p => p.id === renewalData.newProfileId);
     const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
     const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
-    const isMaster = renewalData.activationPaymentMethod === ActivationPaymentMethod.Master;
     const isCustomerWallet =
       (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
-    const serviceFeesAsDebt =
-      !isDeferred &&
-      enabledActivationServiceFees.length > 0 &&
-      (isMaster || isCustomerWallet) &&
-      !activationServiceFeesFullyPaid;
+    const serviceFeesAsDebt = !isDeferred && hasActivationServiceFeesDebt;
 
     if (!isExtension && !isCustomerWallet && (renewalData.remainingAmount || 0) > 0) {
       const due = (renewalData.debtDueDate || '').toString().trim();
@@ -1851,16 +1872,11 @@ const SubscribersPage: React.FC = () => {
       ? []
       : enabledActivationServiceFees.map((fee) => {
           const price = fee.price ?? 0;
-          const amountPaid =
-            isMaster || isCustomerWallet
-              ? activationServiceFeesFullyPaid
-                ? price
-                : 0
-              : price;
+          const fullyPaid = isActivationServiceFeeFullyPaid(fee.id);
           return {
             serviceFeesId: fee.id,
             serviceFeesPrice: price,
-            serviceFeesAmountPaid: amountPaid,
+            serviceFeesAmountPaid: fullyPaid ? price : 0,
           };
         });
     const firstServiceFee = serviceFeesItems[0];
@@ -3926,7 +3942,6 @@ const SubscribersPage: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 const salePrice = selectedProfile?.salePrice || 0;
-                                setActivationServiceFeesFullyPaid(true);
                                 setRenewalData((prev) => ({
                                   ...prev,
                                   activationChannel: RenewalActivationChannel.Normal,
@@ -3947,7 +3962,6 @@ const SubscribersPage: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 const salePrice = selectedProfile?.salePrice || 0;
-                                setActivationServiceFeesFullyPaid(false);
                                 setRenewalData((prev) => ({
                                   ...prev,
                                   activationChannel: RenewalActivationChannel.Normal,
@@ -4054,8 +4068,6 @@ const SubscribersPage: React.FC = () => {
                 const isCustomerWalletChannel =
                   (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
                   RenewalActivationChannel.CustomerWallet;
-                const isMasterPayment =
-                  renewalData.activationPaymentMethod === ActivationPaymentMethod.Master;
                 const hasSubscriptionDebt =
                   !isExtensionForDebt &&
                   !isCustomerWalletChannel &&
@@ -4065,9 +4077,7 @@ const SubscribersPage: React.FC = () => {
                 const hasServiceFeesDebt =
                   !isExtensionForDebt &&
                   !isDeferredPayment &&
-                  enabledActivationServiceFees.length > 0 &&
-                  (isMasterPayment || isCustomerWalletChannel) &&
-                  !activationServiceFeesFullyPaid;
+                  hasActivationServiceFeesDebt;
                 if (!renewalData.newProfileId || (!hasSubscriptionDebt && !hasServiceFeesDebt)) {
                   return null;
                 }
@@ -4109,7 +4119,7 @@ const SubscribersPage: React.FC = () => {
                       <p className="text-sm text-amber-700 dark:text-amber-300">
                         دين أجور الخدمة:{' '}
                         <span className="font-semibold tabular-nums">
-                          {formatNumber(activationServiceFeesTotal, { suffix: ' د.ع' })}
+                          {formatNumber(activationServiceFeesDebtTotal, { suffix: ' د.ع' })}
                         </span>
                       </p>
                     )}
@@ -4138,89 +4148,101 @@ const SubscribersPage: React.FC = () => {
                   <div className="space-y-2">
                     {activationServiceFeesList.map((fee) => {
                       const isEnabled = activationServiceFeesEnabled[fee.id] !== false;
+                      const feeFullyPaid = isActivationServiceFeeFullyPaid(fee.id);
                       const feePrice = fee.price ?? 0;
                       return (
                         <div
                           key={fee.id}
-                          className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3"
+                          className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3 space-y-3"
                         >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">{fee.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 tabular-nums">
-                              {formatNumber(feePrice, { suffix: ' د.ع' })}
-                              {isEnabled ? ' — يُضاف للفاتورة' : ' — غير مفعّل'}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={isEnabled}
-                            aria-label={`تفعيل ${fee.name}`}
-                            onClick={() =>
-                              setActivationServiceFeesEnabled((prev) => ({
-                                ...prev,
-                                [fee.id]: !isEnabled,
-                              }))
-                            }
-                            className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                              isEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                            }`}
-                          >
-                            <span
-                              aria-hidden
-                              className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                isEnabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">{fee.name}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 tabular-nums">
+                                {formatNumber(feePrice, { suffix: ' د.ع' })}
+                                {isEnabled
+                                  ? feeFullyPaid
+                                    ? ' — مفعّل (واصل)'
+                                    : ' — مفعّل (دين)'
+                                  : ' — غير مفعّل'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={isEnabled}
+                              aria-label={`تفعيل ${fee.name}`}
+                              onClick={() => {
+                                const nextEnabled = !isEnabled;
+                                setActivationServiceFeesEnabled((prev) => ({
+                                  ...prev,
+                                  [fee.id]: nextEnabled,
+                                }));
+                                if (nextEnabled) {
+                                  setActivationServiceFeesFullyPaid((prev) => ({
+                                    ...prev,
+                                    [fee.id]: prev[fee.id] ?? true,
+                                  }));
+                                }
+                              }}
+                              className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                isEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
                               }`}
-                            />
-                          </button>
+                            >
+                              <span
+                                aria-hidden
+                                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  isEnabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                          {isEnabled && (
+                            <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-3 py-2.5">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">حالة الأجر</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                  {feeFullyPaid
+                                    ? 'واصل — يُحفظ في الحسابات'
+                                    : 'غير واصل — يُسجَّل كدين على المشترك'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={feeFullyPaid}
+                                aria-label={`واصل ${fee.name}`}
+                                onClick={() => {
+                                  const nextFullyPaid = !feeFullyPaid;
+                                  setActivationServiceFeesFullyPaid((prev) => ({
+                                    ...prev,
+                                    [fee.id]: nextFullyPaid,
+                                  }));
+                                  if (!nextFullyPaid) {
+                                    setRenewalData((prev) => ({
+                                      ...prev,
+                                      debtDueDate:
+                                        prev.debtDueDate || new Date().toISOString().split('T')[0],
+                                    }));
+                                  }
+                                }}
+                                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                                  feeFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                              >
+                                <span
+                                  aria-hidden
+                                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    feeFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
-                  {enabledActivationServiceFees.length > 0 &&
-                    (renewalData.activationPaymentMethod === ActivationPaymentMethod.Master ||
-                      (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
-                        RenewalActivationChannel.CustomerWallet) && (
-                    <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">واصل أجور الخدمة</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {activationServiceFeesFullyPaid
-                            ? 'المبلغ كامل — يُسجَّل في الحسابات كوارد'
-                            : 'غير واصل — يُسجَّل كدين على المشترك'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={activationServiceFeesFullyPaid}
-                        aria-label="واصل أجور الخدمة"
-                        onClick={() => {
-                          setActivationServiceFeesFullyPaid((v) => {
-                            const next = !v;
-                            if (!next) {
-                              setRenewalData((prev) => ({
-                                ...prev,
-                                debtDueDate:
-                                  prev.debtDueDate || new Date().toISOString().split('T')[0],
-                              }));
-                            }
-                            return next;
-                          });
-                        }}
-                        className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
-                          activationServiceFeesFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span
-                          aria-hidden
-                          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            activationServiceFeesFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  )}
                   {enabledActivationServiceFees.length > 0 && (
                     <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
