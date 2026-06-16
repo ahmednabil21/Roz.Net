@@ -455,8 +455,10 @@ const SubscribersPage: React.FC = () => {
     activationPaymentMethod: ActivationPaymentMethod.Cash,
     activationChannel: RenewalActivationChannel.Normal,
   });
-  /** مفعّل = تُضاف أجور الخدمة للفاتورة (واصل) — افتراضي ON لكل البنود */
+  /** مفعّل = تُضاف أجور الخدمة للفاتورة */
   const [activationServiceFeesEnabled, setActivationServiceFeesEnabled] = useState<Record<string, boolean>>({});
+  /** واصل أجور الخدمة — عند ماستر/محفظة الزبون: غير واصل = يُسجَّل كدين */
+  const [activationServiceFeesFullyPaid, setActivationServiceFeesFullyPaid] = useState(true);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
@@ -867,8 +869,10 @@ const SubscribersPage: React.FC = () => {
     if (!showRenewalModal) {
       renewalProfileIdForAmountSyncRef.current = '';
       setActivationServiceFeesEnabled({});
+      setActivationServiceFeesFullyPaid(true);
     } else {
       setRenewalAmountFullyReceived(true);
+      setActivationServiceFeesFullyPaid(true);
     }
   }, [showRenewalModal]);
 
@@ -1698,6 +1702,7 @@ const SubscribersPage: React.FC = () => {
     const salePrice = selectedProfile?.salePrice || 0;
     if (channel === RenewalActivationChannel.CustomerWallet) {
       setRenewalAmountFullyReceived(true);
+      setActivationServiceFeesFullyPaid(false);
       setRenewalData((prev) => ({
         ...prev,
         activationChannel: channel,
@@ -1818,8 +1823,14 @@ const SubscribersPage: React.FC = () => {
     const selectedProfile = renewalInfo?.availableProfiles?.find(p => p.id === renewalData.newProfileId);
     const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
     const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+    const isMaster = renewalData.activationPaymentMethod === ActivationPaymentMethod.Master;
     const isCustomerWallet =
       (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
+    const serviceFeesAsDebt =
+      !isDeferred &&
+      enabledActivationServiceFees.length > 0 &&
+      (isMaster || isCustomerWallet) &&
+      !activationServiceFeesFullyPaid;
 
     if (!isExtension && !isCustomerWallet && (renewalData.remainingAmount || 0) > 0) {
       const due = (renewalData.debtDueDate || '').toString().trim();
@@ -1828,15 +1839,28 @@ const SubscribersPage: React.FC = () => {
         return;
       }
     }
+    if (!isExtension && serviceFeesAsDebt) {
+      const due = (renewalData.debtDueDate || '').toString().trim();
+      if (!due) {
+        showError('خطأ', 'يرجى اختيار تاريخ تسديد الدين عند تسجيل أجور الخدمة كدين.');
+        return;
+      }
+    }
 
     const serviceFeesItems = isDeferred
       ? []
       : enabledActivationServiceFees.map((fee) => {
           const price = fee.price ?? 0;
+          const amountPaid =
+            isMaster || isCustomerWallet
+              ? activationServiceFeesFullyPaid
+                ? price
+                : 0
+              : price;
           return {
             serviceFeesId: fee.id,
             serviceFeesPrice: price,
-            serviceFeesAmountPaid: price,
+            serviceFeesAmountPaid: amountPaid,
           };
         });
     const firstServiceFee = serviceFeesItems[0];
@@ -3902,6 +3926,7 @@ const SubscribersPage: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 const salePrice = selectedProfile?.salePrice || 0;
+                                setActivationServiceFeesFullyPaid(true);
                                 setRenewalData((prev) => ({
                                   ...prev,
                                   activationChannel: RenewalActivationChannel.Normal,
@@ -3922,6 +3947,7 @@ const SubscribersPage: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 const salePrice = selectedProfile?.salePrice || 0;
+                                setActivationServiceFeesFullyPaid(false);
                                 setRenewalData((prev) => ({
                                   ...prev,
                                   activationChannel: RenewalActivationChannel.Normal,
@@ -4028,61 +4054,78 @@ const SubscribersPage: React.FC = () => {
                 const isCustomerWalletChannel =
                   (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
                   RenewalActivationChannel.CustomerWallet;
-                if (
-                  !renewalData.newProfileId ||
-                  isExtensionForDebt ||
-                  isCustomerWalletChannel ||
-                  (renewalAmountFullyReceived && !isDeferredPayment)
-                ) {
+                const isMasterPayment =
+                  renewalData.activationPaymentMethod === ActivationPaymentMethod.Master;
+                const hasSubscriptionDebt =
+                  !isExtensionForDebt &&
+                  !isCustomerWalletChannel &&
+                  !isDeferredPayment &&
+                  !renewalAmountFullyReceived &&
+                  (renewalData.remainingAmount || 0) > 0;
+                const hasServiceFeesDebt =
+                  !isExtensionForDebt &&
+                  !isDeferredPayment &&
+                  enabledActivationServiceFees.length > 0 &&
+                  (isMasterPayment || isCustomerWalletChannel) &&
+                  !activationServiceFeesFullyPaid;
+                if (!renewalData.newProfileId || (!hasSubscriptionDebt && !hasServiceFeesDebt)) {
                   return null;
                 }
                 return (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          مبلغ الدين (د.ع) <span className="text-xs text-gray-500">(محسوب تلقائياً)</span>
-                        </label>
-                        <input
-                          type="number"
-                          name="remainingAmount"
-                          value={renewalData.remainingAmount || 0}
-                          onChange={handleRenewalInputChange}
-                          min="0"
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-800 cursor-not-allowed dark:text-gray-300"
-                          placeholder="مبلغ الدين"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          ملاحظات الدين
-                        </label>
-                        <input
-                          type="text"
-                          name="debtDescription"
-                          value={renewalData.debtDescription || ''}
-                          onChange={handleRenewalInputChange}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                          placeholder="ملاحظات الدين"
-                        />
-                      </div>
-                    </div>
-                    {(renewalData.remainingAmount || 0) > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          تاريخ تسديد الدين *
-                        </label>
-                        <input
-                          type="date"
-                          name="debtDueDate"
-                          value={renewalData.debtDueDate || ''}
-                          onChange={handleRenewalInputChange}
-                          required
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                        />
+                    {hasSubscriptionDebt && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            مبلغ الدين (د.ع) <span className="text-xs text-gray-500">(محسوب تلقائياً)</span>
+                          </label>
+                          <input
+                            type="number"
+                            name="remainingAmount"
+                            value={renewalData.remainingAmount || 0}
+                            onChange={handleRenewalInputChange}
+                            min="0"
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-gray-50 dark:bg-gray-800 cursor-not-allowed dark:text-gray-300"
+                            placeholder="مبلغ الدين"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            ملاحظات الدين
+                          </label>
+                          <input
+                            type="text"
+                            name="debtDescription"
+                            value={renewalData.debtDescription || ''}
+                            onChange={handleRenewalInputChange}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                            placeholder="ملاحظات الدين"
+                          />
+                        </div>
                       </div>
                     )}
+                    {hasServiceFeesDebt && (
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        دين أجور الخدمة:{' '}
+                        <span className="font-semibold tabular-nums">
+                          {formatNumber(activationServiceFeesTotal, { suffix: ' د.ع' })}
+                        </span>
+                      </p>
+                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        تاريخ تسديد الدين *
+                      </label>
+                      <input
+                        type="date"
+                        name="debtDueDate"
+                        value={renewalData.debtDueDate || ''}
+                        onChange={handleRenewalInputChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
                   </>
                 );
               })()}
@@ -4134,6 +4177,50 @@ const SubscribersPage: React.FC = () => {
                       );
                     })}
                   </div>
+                  {enabledActivationServiceFees.length > 0 &&
+                    (renewalData.activationPaymentMethod === ActivationPaymentMethod.Master ||
+                      (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                        RenewalActivationChannel.CustomerWallet) && (
+                    <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 px-4 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">واصل أجور الخدمة</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {activationServiceFeesFullyPaid
+                            ? 'المبلغ كامل — يُسجَّل في الحسابات كوارد'
+                            : 'غير واصل — يُسجَّل كدين على المشترك'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={activationServiceFeesFullyPaid}
+                        aria-label="واصل أجور الخدمة"
+                        onClick={() => {
+                          setActivationServiceFeesFullyPaid((v) => {
+                            const next = !v;
+                            if (!next) {
+                              setRenewalData((prev) => ({
+                                ...prev,
+                                debtDueDate:
+                                  prev.debtDueDate || new Date().toISOString().split('T')[0],
+                              }));
+                            }
+                            return next;
+                          });
+                        }}
+                        className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                          activationServiceFeesFullyPaid ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                        }`}
+                      >
+                        <span
+                          aria-hidden
+                          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            activationServiceFeesFullyPaid ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
                   {enabledActivationServiceFees.length > 0 && (
                     <div className="rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50/80 dark:bg-primary-950/30 px-4 py-3 space-y-1">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">

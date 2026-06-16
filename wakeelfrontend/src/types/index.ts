@@ -2452,6 +2452,8 @@ export interface AccountsResponse {
   totalAgentPackageIncome?: number;
   /** مجموع وارد الأجور */
   totalServiceFeesIncome?: number;
+  /** مجموع ديون أجور الخدمة غير الواصلة */
+  totalServiceFeesDebt?: number;
   /** مجموع وارد الكاشباك */
   totalCashbackIncome?: number;
   subscriberNoteTypes?: AccountsSubscriberNoteTypeOption[];

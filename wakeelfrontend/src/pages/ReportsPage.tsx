@@ -642,6 +642,14 @@ const ReportsPage: React.FC = () => {
               glass
             />
             <StatCard
+              title="ديون الأجور"
+              value={accounts?.totalServiceFeesDebt ?? 0}
+              icon={CreditCard}
+              color="orange"
+              isAmount
+              glass
+            />
+            <StatCard
               title="عدد التمديدات"
               value={accounts?.extension?.count ?? 0}
               icon={Zap}
