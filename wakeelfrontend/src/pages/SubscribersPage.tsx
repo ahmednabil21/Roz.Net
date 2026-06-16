@@ -207,7 +207,7 @@ const DEFAULT_FTTH_COMPARE_PARTNER_ID = '2864647';
 
 const FTTH_COMPARE_PAYMENT_BADGE_STYLES: Record<string, string> = {
   'مشترك جديد':
-    'bg-green-100 text-green-700 dark:bg-green-900/45 dark:text-green-200 ring-1 ring-green-400/50',
+    'bg-blue-100 text-blue-700 dark:bg-blue-900/45 dark:text-blue-200 ring-1 ring-blue-400/50',
   'محفظة الوكيل':
     'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/45 dark:text-emerald-200 ring-1 ring-emerald-400/50',
   'محفظة المشترك او تطبيق الوطني':
@@ -5222,7 +5222,7 @@ const SubscribersPage: React.FC = () => {
                           <td className="px-4 py-3 text-gray-600 dark:text-gray-300 align-top whitespace-normal break-words">{row.createdBy || '—'}</td>
                           <td className="px-4 py-3">
                             {row.isNewSubscriber ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200">
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
                                 مشترك جديد
                               </span>
                             ) : mismatch ? (
@@ -5474,7 +5474,7 @@ const SubscribersPage: React.FC = () => {
                               {deviceOrUsername}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-200">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
                               (مشترك جديد)
                             </span>
                           )}
