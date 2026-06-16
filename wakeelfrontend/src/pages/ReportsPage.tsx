@@ -83,7 +83,7 @@ function activationPaymentMethodLabel(pm?: number | null): string {
   return '—';
 }
 
-const LEDGER_TABLE_COLS = 15;
+const LEDGER_TABLE_COLS = 16;
 
 function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
   kind: 'Renewal';
@@ -590,20 +590,44 @@ const ReportsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4 mb-6">
             <StatCard
               title="الوارد الكلي"
-              value={accounts?.totalReceived ?? 0}
+              value={accounts?.totalGeneralIncome ?? 0}
               icon={DollarSign}
               color="blue"
               isAmount
               glass
             />
             <StatCard
-              title="وارد التفعيلات"
-              value={accounts?.amountPaid ?? 0}
+              title="وارد الباقات"
+              value={accounts?.totalPackageIncome ?? 0}
               icon={Wallet}
               color="green"
+              isAmount
+              glass
+            />
+            <StatCard
+              title="وارد كلفة الوكيل"
+              value={accounts?.totalAgentPackageIncome ?? 0}
+              icon={CreditCard}
+              color="orange"
+              isAmount
+              glass
+            />
+            <StatCard
+              title="وارد الأجور"
+              value={accounts?.totalServiceFeesIncome ?? 0}
+              icon={Coins}
+              color="teal"
+              isAmount
+              glass
+            />
+            <StatCard
+              title="وارد الكاشباك"
+              value={accounts?.totalCashbackIncome ?? accounts?.totalReturnPrice ?? 0}
+              icon={Coins}
+              color="indigo"
               isAmount
               glass
             />
@@ -611,15 +635,7 @@ const ReportsPage: React.FC = () => {
               title="وارد الديون"
               value={accounts?.subscriberTotalDebt ?? 0}
               icon={CreditCard}
-              color="orange"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="وارد الكاشباك"
-              value={accounts?.totalActivationProfit ?? 0}
-              icon={Coins}
-              color="teal"
+              color="purple"
               isAmount
               glass
             />
@@ -663,7 +679,8 @@ const ReportsPage: React.FC = () => {
                         <th>طريقة الدفع</th>
                         <th>كلفة اشتراك الوكيل</th>
                         <th>كلفة اشتراك الوطني</th>
-                        <th>ربح الاجور</th>
+                        <th>وارد عام</th>
+                        <th>مبلغ الأجور</th>
                         <th>مبلغ الكاشباك</th>
                         <th>الربح الكلي</th>
                         <th>تاريخ العملية</th>
@@ -718,14 +735,24 @@ const ReportsPage: React.FC = () => {
                                   ? formatNumber(renewal.nationalSubscriptionCost, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
+                              <td className="whitespace-nowrap font-semibold text-primary-700 dark:text-primary-300">
+                                {row.generalIncome != null
+                                  ? formatNumber(row.generalIncome, { suffix: ' د.ع' })
+                                  : renewal
+                                    ? formatNumber(
+                                        (renewal.nationalSubscriptionCost ?? 0) + (renewal.serviceFeesAmount ?? 0),
+                                        { suffix: ' د.ع' }
+                                      )
+                                    : formatNumber(row.amount ?? 0, { suffix: ' د.ع' })}
+                              </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.serviceFeesAmount != null
                                   ? formatNumber(renewal.serviceFeesAmount, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.activationProfit != null
-                                  ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
+                                {renewal?.returnPrice != null
+                                  ? formatNumber(renewal.returnPrice, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">

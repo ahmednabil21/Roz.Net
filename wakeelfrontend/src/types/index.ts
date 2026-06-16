@@ -2366,6 +2366,8 @@ export interface AccountsLedgerEntryBase {
   renewalDate: string;
   createdAt: string;
   amount: number;
+  /** وارد عام = مبلغ الباقة + الأجور (أو مبلغ تسديد الدين) */
+  generalIncome?: number;
   subscriberId?: string;
   subscriberName?: string;
   username?: string;
@@ -2428,6 +2430,16 @@ export interface AccountsResponse {
   totalActivationProfit: number;
   /** مجموع مبالغ الكاشباك ضمن الفترة والفلاتر */
   totalReturnPrice?: number;
+  /** مجموع الوارد الكلي = مبلغ الباقة + الأجور + تسديد الديون */
+  totalGeneralIncome?: number;
+  /** مجموع وارد الباقات (كلفة اشتراك الوطني) */
+  totalPackageIncome?: number;
+  /** مجموع وارد كلفة الوكيل */
+  totalAgentPackageIncome?: number;
+  /** مجموع وارد الأجور */
+  totalServiceFeesIncome?: number;
+  /** مجموع وارد الكاشباك */
+  totalCashbackIncome?: number;
   subscriberNoteTypes?: AccountsSubscriberNoteTypeOption[];
   ledger: AccountsLedgerPage;
 }
