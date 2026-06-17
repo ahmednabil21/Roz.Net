@@ -529,6 +529,7 @@ export interface SynchronizationDiffSaveRequest {
 
 /** صف مقارنة FTTH — POST /providers/sas/ftth-subscriptions/compare */
 export interface FtthSubscriptionsCompareItem {
+  basePlanRenewalCount?: number | null;
   createdBy?: string | null;
   customerName?: string | null;
   ftthActivation?: string | null;
@@ -536,7 +537,9 @@ export interface FtthSubscriptionsCompareItem {
   isNewSubscriber?: boolean;
   localActivation?: string | null;
   localExpiration?: string | null;
+  packageName?: string | null;
   paymentType?: string | null;
+  sameDayBasePlanRenewalCount?: number | null;
   username?: string | null;
 }
 

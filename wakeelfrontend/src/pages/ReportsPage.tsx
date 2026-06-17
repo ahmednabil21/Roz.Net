@@ -761,16 +761,12 @@ const ReportsPage: React.FC = () => {
                                         (renewal.nationalSubscriptionCost ?? 0) + (renewal.serviceFeesAmount ?? 0),
                                         { suffix: ' د.ع' }
                                       )
-                                    : row.serviceFeesAmount != null
-                                      ? formatNumber(row.serviceFeesAmount, { suffix: ' د.ع' })
-                                      : '—'}
+                                    : '—'}
                               </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.serviceFeesAmount != null
                                   ? formatNumber(renewal.serviceFeesAmount, { suffix: ' د.ع' })
-                                  : !renewal && row.serviceFeesAmount != null
-                                    ? formatNumber(row.serviceFeesAmount, { suffix: ' د.ع' })
-                                    : '—'}
+                                  : '—'}
                               </td>
                               <td className="whitespace-nowrap">
                                 {renewal?.activationProfit != null

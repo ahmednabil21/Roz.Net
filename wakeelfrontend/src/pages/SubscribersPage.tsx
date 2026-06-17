@@ -5135,25 +5135,27 @@ const SubscribersPage: React.FC = () => {
             </div>
 
             <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1">
-              <table className="min-w-full w-full text-sm text-right border-separate border-spacing-0 table-fixed">
+              <table className="min-w-[1600px] w-full text-sm text-right border-separate border-spacing-0 table-fixed">
                 <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[26%] min-w-[260px]">اسم المشترك</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[11%]">اسم المستخدم</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">تفعيل FTTH</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">انتهاء FTTH</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">تفعيل محلي</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">انتهاء محلي</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[11%]">طريقة الدفع</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">أُنشئ بواسطة</th>
-                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[6%]">الحالة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[22%] min-w-[260px]">اسم المشترك</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">اسم المستخدم</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">باقة المشترك</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">عدد مرات التفعيل</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">تفعيل FTTH</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">انتهاء FTTH</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">تفعيل محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%]">انتهاء محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[10%]">طريقة الدفع</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[9%]">أُنشئ بواسطة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[7%]">الحالة</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 w-[8%] min-w-[100px]">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(ftthCompareResult.items ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={12} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
                         لا توجد نتائج للعرض.
                       </td>
                     </tr>
@@ -5161,6 +5163,7 @@ const SubscribersPage: React.FC = () => {
                     (ftthCompareResult.items ?? []).map((row, idx) => {
                       const mismatch = ftthCompareRowHasMismatch(row);
                       const username = (row.username ?? '').trim();
+                      const renewalCount = Number(row.sameDayBasePlanRenewalCount ?? 0);
                       const isOpeningSync = openingFtthCompareRowIndex === idx;
                       const isSynced = activatedFtthCompareRowIndices.has(idx);
                       return (
@@ -5181,6 +5184,26 @@ const SubscribersPage: React.FC = () => {
                             ) : (
                               '—'
                             )}
+                          </td>
+                          <td className="px-4 py-3 align-top whitespace-normal break-words">
+                            {row.packageName ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                                {row.packageName}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <span
+                              className={`inline-flex items-center justify-center min-w-8 px-2.5 py-1 rounded-full text-xs font-bold ${
+                                renewalCount > 1
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/45 dark:text-red-200 ring-1 ring-red-400/50'
+                                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+                              }`}
+                            >
+                              {Number.isFinite(renewalCount) ? renewalCount : 0}
+                            </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap align-top">
                             {row.ftthActivation ? formatDate(row.ftthActivation, FTTH_COMPARE_DATE_OPTIONS) : '—'}
