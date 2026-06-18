@@ -616,7 +616,7 @@ const ReportsPage: React.FC = () => {
               glass
             />
             <StatCard
-              title="وارد الباقات"
+              title="اقتطاع الباقات"
               value={accounts?.totalPackageIncome ?? 0}
               icon={Wallet}
               color="green"
@@ -624,7 +624,7 @@ const ReportsPage: React.FC = () => {
               glass
             />
             <StatCard
-              title="وارد كلفة الوكيل"
+              title="اقتطاع كلفة الوكيل"
               value={accounts?.totalAgentPackageIncome ?? 0}
               icon={CreditCard}
               color="orange"
