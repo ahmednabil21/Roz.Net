@@ -6311,8 +6311,8 @@ const SubscribersPage: React.FC = () => {
       )}
 
       {showFtthAppTransactionsModal && ftthAppTransactionsResult && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
-          <div className="w-[98vw] max-w-[1400px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/60 flex flex-col p-0">
+          <div className="w-full h-full bg-white dark:bg-gray-800 shadow-xl overflow-hidden flex flex-col">
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">مقارنة محفظة الزبون / التطبيق</h3>
@@ -6331,21 +6331,21 @@ const SubscribersPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1">
-              <table className="min-w-[1400px] w-full text-sm text-right border-separate border-spacing-0">
-                <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10">
+            <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1 min-h-0">
+              <table className="w-full min-w-full text-sm text-right border-separate border-spacing-0">
+                <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="px-4 py-3 border-b font-semibold">اسم المشترك</th>
-                    <th className="px-4 py-3 border-b font-semibold">اسم المستخدم</th>
-                    <th className="px-4 py-3 border-b font-semibold">الباقة</th>
-                    <th className="px-4 py-3 border-b font-semibold text-red-600 dark:text-red-400 font-bold">مبلغ الاستقطاع</th>
-                    <th className="px-4 py-3 border-b font-semibold">تفعيل التطبيق</th>
-                    <th className="px-4 py-3 border-b font-semibold">انتهاء التطبيق</th>
-                    <th className="px-4 py-3 border-b font-semibold">تفعيل محلي</th>
-                    <th className="px-4 py-3 border-b font-semibold">انتهاء محلي</th>
-                    <th className="px-4 py-3 border-b font-semibold">طريقة الدفع</th>
-                    <th className="px-4 py-3 border-b font-semibold">عدد التفعيلات</th>
-                    <th className="px-4 py-3 border-b font-semibold">إجراءات</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">اسم المشترك</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">اسم المستخدم</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">الباقة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-red-600 dark:text-red-400 whitespace-nowrap font-bold">مبلغ الاستقطاع</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">تفعيل التطبيق</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">انتهاء التطبيق</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">تفعيل محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">انتهاء محلي</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">طريقة الدفع</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">عدد التفعيلات</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap min-w-[100px]">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -6428,11 +6428,11 @@ const SubscribersPage: React.FC = () => {
               </table>
             </div>
 
-            <div className="px-5 py-4 border-t flex justify-end">
+            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowFtthAppTransactionsModal(false)}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md text-gray-700 dark:text-gray-200"
               >
                 إغلاق
               </button>

@@ -561,8 +561,9 @@ export interface FtthSubscriptionsCompareCustomer {
   displayValue?: string | null;
 }
 
-/** مبلغ الاستقطاع من الرصيد — transactionAmount.value من سكربت FTTH */
+/** مبلغ الاستقطاع من الرصيد — transactionAmount من سكربت FTTH */
 export interface FtthTransactionAmount {
+  currency?: string | null;
   value?: number | null;
 }
 
