@@ -186,6 +186,20 @@ function resolveFtthCompareCustomerName(row: FtthSubscriptionsCompareItem): stri
   );
 }
 
+function resolveFtthCompareLocalPackagePrice(
+  row: FtthSubscriptionsCompareItem,
+  profiles: Profile[],
+): number | null {
+  const pkg = (row.packageName ?? '').trim().toLowerCase();
+  if (!pkg) return null;
+  const match = profiles.find((p) => (p.name ?? '').trim().toLowerCase() === pkg);
+  if (!match) return null;
+  if (match.balanceDeductionAmount != null && match.balanceDeductionAmount > 0) {
+    return match.balanceDeductionAmount;
+  }
+  return match.salePrice ?? null;
+}
+
 function buildSyntheticSubscriberFromFtthRow(
   row: FtthSubscriptionsCompareItem,
   resellerId: string,
@@ -700,6 +714,15 @@ const SubscribersPage: React.FC = () => {
   const activeProfiles = React.useMemo(
     () => profiles.filter((p) => p.isActive),
     [profiles]
+  );
+  const { data: ftthCompareProfilesResponse } = useQuery({
+    queryKey: ['profiles', 'ftth-compare', ftthCompareResellerId, online],
+    queryFn: () => fetchProfilesWithCache(online, { page: 1, pageSize: 200, resellerId: ftthCompareResellerId }),
+    enabled: showFtthCompareModal && !!ftthCompareResellerId,
+  });
+  const ftthCompareProfiles = React.useMemo(
+    () => ((ftthCompareProfilesResponse?.data ?? []) as Profile[]).filter((p) => p.isActive),
+    [ftthCompareProfilesResponse],
   );
   const { data: renewalProfiles = [] } = useQuery<Profile[]>({
     queryKey: ['renewal-profiles', renewalResellerIdForProfiles ?? '__no_reseller__'],
@@ -6111,6 +6134,7 @@ const SubscribersPage: React.FC = () => {
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">اسم المستخدم</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">باقة المشترك</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">سعر الباقة</th>
+                    <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">planPrice</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">نوع العملية</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">عدد مرات التفعيل</th>
                     <th className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">تفعيل FTTH</th>
@@ -6124,7 +6148,7 @@ const SubscribersPage: React.FC = () => {
                 <tbody>
                   {(ftthCompareResult.items ?? []).length === 0 ? (
                     <tr>
-                      <td colSpan={12} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={13} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
                         لا توجد نتائج للعرض.
                       </td>
                     </tr>
@@ -6163,8 +6187,16 @@ const SubscribersPage: React.FC = () => {
                               '—'
                             )}
                           </td>
-                          <td className="px-4 py-3 align-top whitespace-normal break-words">
-                            {row.planPrice != null && Number(row.planPrice) > 0
+                          <td className="px-4 py-3 align-top whitespace-normal break-words text-gray-900 dark:text-gray-100">
+                            {(() => {
+                              const localPrice = resolveFtthCompareLocalPackagePrice(row, ftthCompareProfiles);
+                              return localPrice != null
+                                ? formatNumber(localPrice, { suffix: ' د.ع' })
+                                : '—';
+                            })()}
+                          </td>
+                          <td className="px-4 py-3 align-top whitespace-normal break-words font-semibold text-red-600 dark:text-red-400">
+                            {row.planPrice != null && Number.isFinite(Number(row.planPrice))
                               ? formatNumber(Number(row.planPrice), { suffix: ' د.ع' })
                               : '—'}
                           </td>
