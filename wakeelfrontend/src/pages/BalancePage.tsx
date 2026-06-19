@@ -2,17 +2,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
 import { BalanceTopUpRequest, BalanceTopUpUpdateRequest, BalanceTopUpsPageResponse, PACKING_SOURCE_OPTIONS, PackingSource, UserRole } from '../types';
 import { getAgentBalance } from '../utils/balance';
 import { showSuccess, showError } from '../utils/notifications';
-import { Wallet, Plus, History, X, User, CircleDollarSign, Pencil } from 'lucide-react';
+import { Wallet, Plus, History, X, User, CircleDollarSign, Pencil, Trash2 } from 'lucide-react';
 
 const BalancePage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const { formatNumber, formatDate } = useDigits();
+  const { confirmAction } = useConfirmation();
   const queryClient = useQueryClient();
 
   const balanceQueryEnabled =
@@ -98,6 +100,18 @@ const BalancePage: React.FC = () => {
     },
     onError: (err: unknown) => {
       showError('خطأ في التعبئة', ApiService.showError(err));
+    },
+  });
+
+  const deleteTopUpMutation = useMutation({
+    mutationFn: (id: string) => apiService.deleteBalanceTopUp(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['balance-topups'] });
+      queryClient.invalidateQueries({ queryKey: ['balance-detail'] });
+      showSuccess('تم الحذف', 'تم حذف سجل التعبئة وخصم المبلغ من الرصيد');
+    },
+    onError: (err: unknown) => {
+      showError('خطأ في الحذف', ApiService.showError(err));
     },
   });
 
@@ -203,6 +217,15 @@ const BalancePage: React.FC = () => {
         packingSource: editTopUpForm.packingSource,
       },
     });
+  };
+
+  const handleDeleteTopUp = async (row: (typeof topUpsList)[number]) => {
+    const ok = await confirmAction(
+      'حذف التعبئة',
+      `هل تريد حذف تعبئة ${formatNumber(row.amountIqd, { suffix: ' د.ع' })} للمستلم «${row.recipientName}»؟ سيُخصم المبلغ من الرصيد.`
+    );
+    if (!ok) return;
+    deleteTopUpMutation.mutate(row.id);
   };
 
   const canManageBalance =
@@ -349,14 +372,25 @@ const BalancePage: React.FC = () => {
                     <td className="px-3 py-2">{row.topUpDate ? formatDate(row.topUpDate) : '—'}</td>
                     {canManageBalance && (
                       <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditTopUp(row)}
-                          className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline text-xs"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          تعديل
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditTopUp(row)}
+                            className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline text-xs"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            تعديل
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteTopUp(row)}
+                            disabled={deleteTopUpMutation.isPending}
+                            className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 hover:underline text-xs disabled:opacity-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            حذف
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>

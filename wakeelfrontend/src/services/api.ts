@@ -3033,6 +3033,13 @@ class ApiService {
     return response.data;
   }
 
+  async deleteBalanceTopUp(id: string): Promise<AgentBalanceTopUp> {
+    const response = await this.api.delete<AgentBalanceTopUp>(
+      `/Renewals/balance/topups/${encodeURIComponent(id)}`
+    );
+    return response.data;
+  }
+
   async getBalanceTopUps(
     page: number = 1,
     pageSize: number = 20,
