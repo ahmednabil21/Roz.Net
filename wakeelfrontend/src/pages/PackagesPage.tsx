@@ -27,7 +27,7 @@ import {
 const PAGE_SIZE_OPTIONS = [6, 12, 24, 48];
 
 function computeReturnPrice(originalPrice: number, salePrice: number): number {
-  return Math.max(0, Math.round((Number(originalPrice) - Number(salePrice)) * 100) / 100);
+  return Math.max(0, Math.round((Number(salePrice) - Number(originalPrice)) * 100) / 100);
 }
 
 const PackagesPage: React.FC = () => {
@@ -771,7 +771,7 @@ const PackagesPage: React.FC = () => {
                   {formatNumber(computeReturnPrice(formData.originalPrice, formData.salePrice), { suffix: ' د.ع' })}
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  يُحسب تلقائياً: السعر على الوكيل − السعر على المشترك
+                  يُحسب تلقائياً: السعر على المشترك − السعر على الوكيل
                 </p>
               </div>
               )}
@@ -1043,7 +1043,7 @@ const PackagesPage: React.FC = () => {
                   {formatNumber(computeReturnPrice(editFormData.originalPrice, editFormData.salePrice), { suffix: ' د.ع' })}
                 </div>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  يُحسب تلقائياً: السعر على الوكيل − السعر على المشترك
+                  يُحسب تلقائياً: السعر على المشترك − السعر على الوكيل
                 </p>
               </div>
               )}
