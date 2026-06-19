@@ -551,6 +551,8 @@ export interface FtthCompareSyncContext {
   resellerId: string;
   zone?: string | null;
   periodCount: number;
+  /** تفعيل من محفظة الزبون/التطبيق */
+  walletSync?: boolean;
 }
 
 /** كائن العميل من سكربت FTTH */
@@ -574,6 +576,9 @@ export interface FtthSubscriptionsCompareItem {
   localExpiration?: string | null;
   packageName?: string | null;
   paymentType?: string | null;
+  planPrice?: number | null;
+  operationType?: string | null;
+  transactionType?: string | null;
   sameDayBasePlanRenewalCount?: number | null;
   username?: string | null;
 }
@@ -586,6 +591,36 @@ export interface FtthSubscriptionsCompareResponse {
   error?: string | null;
   zone?: string | null;
   partnerId?: string | null;
+}
+
+/** عنصر من POST /providers/sas/ftth-transactions/app (مقارنة محفظة الزبون) */
+export interface FtthAppTransactionsItem {
+  activationCount: number;
+  customerId: string;
+  customerName: string;
+  endsAt?: string | null;
+  isNewSubscriber: boolean;
+  localActivation?: string | null;
+  localExpiration?: string | null;
+  occuredAt?: string | null;
+  packageName?: string | null;
+  paymentType?: string | null;
+  planPrice: number;
+  startsAt?: string | null;
+  username: string;
+}
+
+/** استجابة POST /providers/sas/ftth-transactions/app */
+export interface FtthAppTransactionsResponse {
+  success: boolean;
+  count?: number;
+  agentId?: string | null;
+  baseUrl?: string | null;
+  name?: string | null;
+  resellerId?: string | null;
+  totalCount: number;
+  items: FtthAppTransactionsItem[];
+  error?: string | null;
 }
 
 /** استجابة GET .../synchronizationFTTH/diff أو .../synchronizationSAS/diff */
@@ -1473,8 +1508,12 @@ export interface Profile {
   name: string;
   originalPrice: number;
   salePrice: number;
+  /** مبلغ استقطاع الرصيد عند التفعيل */
+  balanceDeductionAmount?: number;
   /** مبلغ الكاشباك (returnPrice) */
   returnPrice?: number;
+  /** إذا true يُحسب الكاشباك */
+  cashbackEnabled?: boolean;
   renewalPeriod: number; // فترة التجديد بالأيام
   packageType?: ProfilePackageType;
   /** مواد مرتبطة بباقة «عرض خاص» (عند packageType = SpecialOffer) */
@@ -1492,7 +1531,9 @@ export interface ProfileCreateRequest {
   name: string;
   originalPrice: number;
   salePrice: number;
+  balanceDeductionAmount?: number;
   returnPrice?: number;
+  cashbackEnabled?: boolean;
   renewalPeriod: number; // فترة التجديد بالأيام
   packageType?: ProfilePackageType;
   includedMaterialIds?: string[];
@@ -1505,7 +1546,9 @@ export interface ProfileUpdateRequest {
   name: string;
   originalPrice: number;
   salePrice: number;
+  balanceDeductionAmount?: number;
   returnPrice?: number;
+  cashbackEnabled?: boolean;
   renewalPeriod: number; // فترة التجديد بالأيام
   packageType?: ProfilePackageType;
   includedMaterialIds?: string[];

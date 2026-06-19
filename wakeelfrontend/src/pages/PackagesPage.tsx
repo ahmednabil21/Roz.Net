@@ -55,7 +55,9 @@ const PackagesPage: React.FC = () => {
     name: '',
     originalPrice: 0,
     salePrice: 0,
+    balanceDeductionAmount: 0,
     returnPrice: 0,
+    cashbackEnabled: true,
     renewalPeriod: 30, // فترة التجديد بالأيام
     packageType: ProfilePackageType.Subscription,
     includedMaterialIds: [],
@@ -67,7 +69,9 @@ const PackagesPage: React.FC = () => {
     name: '',
     originalPrice: 0,
     salePrice: 0,
+    balanceDeductionAmount: 0,
     returnPrice: 0,
+    cashbackEnabled: true,
     renewalPeriod: 30, // فترة التجديد بالأيام
     packageType: ProfilePackageType.Subscription,
     includedMaterialIds: [],
@@ -155,7 +159,9 @@ const PackagesPage: React.FC = () => {
         name: '',
         originalPrice: 0,
         salePrice: 0,
+        balanceDeductionAmount: 0,
         returnPrice: 0,
+        cashbackEnabled: true,
         renewalPeriod: 30,
         packageType: ProfilePackageType.Subscription,
         includedMaterialIds: [],
@@ -181,7 +187,9 @@ const PackagesPage: React.FC = () => {
         name: '',
         originalPrice: 0,
         salePrice: 0,
+        balanceDeductionAmount: 0,
         returnPrice: 0,
+        cashbackEnabled: true,
         renewalPeriod: 30,
         packageType: ProfilePackageType.Subscription,
         includedMaterialIds: [],
@@ -222,7 +230,9 @@ const PackagesPage: React.FC = () => {
     }
     const payload: ProfileCreateRequest = {
       ...formData,
-      returnPrice: computeReturnPrice(formData.originalPrice, formData.salePrice),
+      returnPrice: formData.cashbackEnabled !== false
+        ? computeReturnPrice(formData.originalPrice, formData.salePrice)
+        : 0,
       regionId: formRegionId,
       agentResellerId: formResellerId,
       includedMaterialIds:
@@ -234,11 +244,21 @@ const PackagesPage: React.FC = () => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'name' ? value : Number(value)
-    }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: name === 'name'
+          ? value
+          : type === 'checkbox'
+            ? checked
+            : Number(value),
+      } as ProfileCreateRequest;
+      if (name === 'salePrice' && (prev.balanceDeductionAmount ?? 0) === (prev.salePrice ?? 0)) {
+        next.balanceDeductionAmount = Number(value) || 0;
+      }
+      return next;
+    });
   };
 
   const handlePackageTypeChange = (type: ProfilePackageType) => {
@@ -252,11 +272,21 @@ const PackagesPage: React.FC = () => {
   };
 
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setEditFormData((prev: ProfileUpdateRequest) => ({
-      ...prev,
-      [name]: name === 'name' ? value : name === 'isActive' ? e.target.checked : Number(value)
-    }));
+    const { name, value, type, checked } = e.target;
+    setEditFormData((prev: ProfileUpdateRequest) => {
+      const next = {
+        ...prev,
+        [name]: name === 'name'
+          ? value
+          : name === 'isActive' || type === 'checkbox'
+            ? checked
+            : Number(value),
+      } as ProfileUpdateRequest;
+      if (name === 'salePrice' && (prev.balanceDeductionAmount ?? 0) === (prev.salePrice ?? 0)) {
+        next.balanceDeductionAmount = Number(value) || 0;
+      }
+      return next;
+    });
   };
 
   const handleEditPackageTypeChange = (type: ProfilePackageType) => {
@@ -281,7 +311,9 @@ const PackagesPage: React.FC = () => {
       name: pkg.name,
       originalPrice: pkg.originalPrice,
       salePrice: pkg.salePrice,
+      balanceDeductionAmount: pkg.balanceDeductionAmount ?? pkg.salePrice ?? 0,
       returnPrice: pkg.returnPrice ?? 0,
+      cashbackEnabled: pkg.cashbackEnabled !== false,
       renewalPeriod: pkg.renewalPeriod || 30,
       packageType: pkg.packageType ?? ProfilePackageType.Subscription,
       includedMaterialIds: [...(pkg.includedMaterialIds ?? [])],
@@ -299,7 +331,9 @@ const PackagesPage: React.FC = () => {
     if (editingPackage) {
       const data: ProfileUpdateRequest = {
         ...editFormData,
-        returnPrice: computeReturnPrice(editFormData.originalPrice, editFormData.salePrice),
+        returnPrice: editFormData.cashbackEnabled !== false
+          ? computeReturnPrice(editFormData.originalPrice, editFormData.salePrice)
+          : 0,
         regionId: editFormRegionId,
         agentResellerId: editFormResellerId,
         includedMaterialIds:
@@ -697,6 +731,40 @@ const PackagesPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  استقطاع الرصيد عند التفعيل (د.ع) *
+                </label>
+                <input
+                  type="number"
+                  name="balanceDeductionAmount"
+                  value={formData.balanceDeductionAmount ?? 0}
+                  onChange={handleInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="المبلغ المُستقطَع من رصيد الرسيلر"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  يُخصم من رصيد الرسيلر/الوكيل عند كل تفعيل (مستقل عن سعر المشترك).
+                </p>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="cashbackEnabled"
+                  checked={formData.cashbackEnabled !== false}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label className="mr-2 block text-sm text-gray-900 dark:text-white">
+                  حساب الكاشباك لهذه الباقة
+                </label>
+              </div>
+
+              {formData.cashbackEnabled !== false && formData.packageType !== ProfilePackageType.Extension && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الكاشباك (د.ع)
                 </label>
                 <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white text-sm">
@@ -706,6 +774,7 @@ const PackagesPage: React.FC = () => {
                   يُحسب تلقائياً: السعر على الوكيل − السعر على المشترك
                 </p>
               </div>
+              )}
 
               {formData.packageType === ProfilePackageType.SpecialOffer && (
                 <div>
@@ -934,6 +1003,40 @@ const PackagesPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  استقطاع الرصيد عند التفعيل (د.ع) *
+                </label>
+                <input
+                  type="number"
+                  name="balanceDeductionAmount"
+                  value={editFormData.balanceDeductionAmount ?? 0}
+                  onChange={handleEditInputChange}
+                  required
+                  min="0"
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="المبلغ المُستقطَع من رصيد الرسيلر"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  يُخصم من رصيد الرسيلر/الوكيل عند كل تفعيل (مستقل عن سعر المشترك).
+                </p>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="cashbackEnabled"
+                  checked={editFormData.cashbackEnabled !== false}
+                  onChange={handleEditInputChange}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label className="mr-2 block text-sm text-gray-900 dark:text-white">
+                  حساب الكاشباك لهذه الباقة
+                </label>
+              </div>
+
+              {editFormData.cashbackEnabled !== false && editFormData.packageType !== ProfilePackageType.Extension && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   مبلغ الكاشباك (د.ع)
                 </label>
                 <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white text-sm">
@@ -943,6 +1046,7 @@ const PackagesPage: React.FC = () => {
                   يُحسب تلقائياً: السعر على الوكيل − السعر على المشترك
                 </p>
               </div>
+              )}
 
               {editFormData.packageType === ProfilePackageType.SpecialOffer && (
                 <div>

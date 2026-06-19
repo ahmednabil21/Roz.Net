@@ -3452,6 +3452,37 @@ class ApiService {
     };
   }
 
+  /** POST /providers/sas/ftth-transactions/app — تفعيلات محفظة الزبون/التطبيق من سكربت FTTH */
+  async fetchFtthAppTransactions(params: {
+    resellerId: string;
+    regionId?: string;
+    days?: number;
+    pageSize?: number;
+    fetchAllPages?: boolean;
+    agentId?: string;
+  }): Promise<import('../types').FtthAppTransactionsResponse> {
+    const query: Record<string, string> = {};
+    if (params.agentId) query.agentId = params.agentId;
+    const response = await this.api.post<import('../types').FtthAppTransactionsResponse>(
+      '/providers/sas/ftth-transactions/app',
+      {
+        resellerId: params.resellerId,
+        regionId: params.regionId || undefined,
+        days: params.days ?? 7,
+        pageSize: params.pageSize ?? 100,
+        fetchAllPages: params.fetchAllPages !== false,
+      },
+      { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
+    );
+    const data = response.data;
+    return {
+      ...data,
+      items: Array.isArray(data?.items) ? data.items : [],
+      count: data?.count ?? data?.totalCount ?? (Array.isArray(data?.items) ? data.items.length : 0),
+      totalCount: data?.totalCount ?? data?.count ?? (Array.isArray(data?.items) ? data.items.length : 0),
+    };
+  }
+
   /** GET /providers/sas/synchronizationFTTH/diff — مقارنة تاريخ انتهاء FTTH مع النظام */
   async synchronizationFTTHDiff(params?: {
     resellerId?: string;

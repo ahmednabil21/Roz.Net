@@ -18,7 +18,7 @@ import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -348,6 +348,27 @@ function resolveFtthComparePartnerId(resellers: AgentReseller[], resellerId: str
   return fromReseller || DEFAULT_FTTH_COMPARE_PARTNER_ID;
 }
 
+function mapFtthAppTransactionToCompareItem(item: FtthAppTransactionsItem): FtthSubscriptionsCompareItem {
+  return {
+    customerName: item.customerName,
+    customerId: item.customerId,
+    customer: item.customerId
+      ? { id: item.customerId, displayValue: item.customerName }
+      : undefined,
+    username: item.username,
+    packageName: item.packageName,
+    ftthActivation: item.startsAt,
+    ftthExpiration: item.endsAt,
+    localActivation: item.localActivation,
+    localExpiration: item.localExpiration,
+    paymentType: item.paymentType,
+    planPrice: item.planPrice,
+    isNewSubscriber: item.isNewSubscriber,
+    basePlanRenewalCount: item.activationCount,
+    sameDayBasePlanRenewalCount: 0,
+  };
+}
+
 function ftthComparePaymentLabel(paymentType?: string | null): string {
   const raw = String(paymentType ?? '').trim();
   if (!raw) return '—';
@@ -496,6 +517,10 @@ const SubscribersPage: React.FC = () => {
   const [autoSyncFtthResult, setAutoSyncFtthResult] = useState<CashbackSynchronizationFtthResponse | null>(null);
   const [showFtthCompareFormModal, setShowFtthCompareFormModal] = useState(false);
   const [showFtthCompareModal, setShowFtthCompareModal] = useState(false);
+  const [showFtthSyncTypeModal, setShowFtthSyncTypeModal] = useState(false);
+  const [showFtthWalletFormModal, setShowFtthWalletFormModal] = useState(false);
+  const [showFtthAppTransactionsModal, setShowFtthAppTransactionsModal] = useState(false);
+  const [ftthAppTransactionsResult, setFtthAppTransactionsResult] = useState<FtthAppTransactionsResponse | null>(null);
   const [ftthCompareResult, setFtthCompareResult] = useState<FtthSubscriptionsCompareResponse | null>(null);
   const [ftthCompareRegionId, setFtthCompareRegionId] = useState('');
   const [ftthCompareResellerId, setFtthCompareResellerId] = useState('');
@@ -1247,6 +1272,35 @@ const SubscribersPage: React.FC = () => {
     },
   });
 
+  const ftthAppTransactionsMutation = useMutation({
+    mutationFn: () => {
+      if (!ftthCompareResellerId) {
+        throw new Error('اختر الرسيلر.');
+      }
+      return apiService.fetchFtthAppTransactions({
+        resellerId: ftthCompareResellerId,
+        regionId: ftthCompareRegionId || undefined,
+        days: ftthCompareDays,
+        pageSize: 100,
+        fetchAllPages: true,
+        agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
+      });
+    },
+    onSuccess: (res) => {
+      if (!res.success) {
+        showError('محفظة الزبون', res.error || 'فشل جلب التفعيلات.');
+        return;
+      }
+      setFtthAppTransactionsResult(res);
+      setShowFtthWalletFormModal(false);
+      setShowFtthAppTransactionsModal(true);
+      showSuccess('محفظة الزبون', `تم جلب ${res.count ?? res.totalCount ?? res.items?.length ?? 0} تفعيلاً للمراجعة.`);
+    },
+    onError: (err: unknown) => {
+      showError('محفظة الزبون', ApiService.showError(err));
+    },
+  });
+
   const openFtthCompareForm = (prefill?: { regionId?: string; resellerId?: string }) => {
     const regionId = prefill?.regionId ?? selectedOperationalRegionId ?? ftthResellersForCompare[0]?.regionId ?? '';
     const regionFiltered = filterResellersByRegion(ftthResellersForCompare, regionId);
@@ -1265,8 +1319,25 @@ const SubscribersPage: React.FC = () => {
     setShowFtthCompareFormModal(true);
   };
 
+  const openFtthWalletForm = (prefill?: { regionId?: string; resellerId?: string }) => {
+    const regionId = prefill?.regionId ?? selectedOperationalRegionId ?? ftthResellersForCompare[0]?.regionId ?? '';
+    const regionFiltered = filterResellersByRegion(ftthResellersForCompare, regionId);
+    const resellerId =
+      prefill?.resellerId ??
+      ((selectedOperationalResellerId && regionFiltered.some((r) => r.id === selectedOperationalResellerId)
+        ? selectedOperationalResellerId
+        : '') ||
+        regionFiltered[0]?.id ||
+        ftthResellersForCompare[0]?.id ||
+        '');
+    setFtthCompareRegionId(regionId);
+    setFtthCompareResellerId(resellerId);
+    setFtthCompareDays(7);
+    setShowFtthWalletFormModal(true);
+  };
+
   const handleAutoSyncClick = () => {
-    if (ftthCompareMutation.isPending || synchronizationFtthMutation.isPending) return;
+    if (ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending) return;
 
     const hasFtth = ftthResellersForCompare.length > 0;
     const hasSas = myResellers.some((r) => r.serviceType === ServiceType.Sas);
@@ -1277,7 +1348,7 @@ const SubscribersPage: React.FC = () => {
     }
 
     if (hasFtth) {
-      openFtthCompareForm();
+      setShowFtthSyncTypeModal(true);
       return;
     }
 
@@ -1418,7 +1489,12 @@ const SubscribersPage: React.FC = () => {
     }
   };
 
-  const openRenewalModalForFtthCompareRow = async (row: FtthSubscriptionsCompareItem, rowIndex: number) => {
+  const openRenewalModalForFtthCompareRow = async (
+    row: FtthSubscriptionsCompareItem,
+    rowIndex: number,
+    options?: { walletSync?: boolean },
+  ) => {
+    const walletSync = options?.walletSync === true;
     const username = (row.username ?? '').toString().trim();
     if (!username) {
       showError('مزامنة التفعيل', 'لا يمكن المزامنة لأن اسم المستخدم فارغ.');
@@ -1455,6 +1531,7 @@ const SubscribersPage: React.FC = () => {
         resellerId: ftthCompareResellerId,
         zone: ftthCompareResult?.zone,
         periodCount,
+        walletSync,
       };
 
       setFtthCompareSyncContext(syncContext);
@@ -1474,8 +1551,12 @@ const SubscribersPage: React.FC = () => {
         serviceFeesId: '',
         serviceFeesPrice: undefined,
         serviceFeesAmountPaid: undefined,
-        activationPaymentMethod: ActivationPaymentMethod.Cash,
-        activationChannel: RenewalActivationChannel.Normal,
+        activationPaymentMethod: walletSync
+          ? ActivationPaymentMethod.CustomerWallet
+          : ActivationPaymentMethod.Cash,
+        activationChannel: walletSync
+          ? RenewalActivationChannel.CustomerWallet
+          : RenewalActivationChannel.Normal,
         renewalDate: periods[0]?.renewalDate,
         newExpirationDate: periods[periods.length - 1]?.newExpirationDate ?? periods[0]?.newExpirationDate,
       });
@@ -1483,6 +1564,7 @@ const SubscribersPage: React.FC = () => {
       setRenewalViaSasTab(false);
       setPendingFtthCompareRowIndex(rowIndex);
       setShowFtthCompareModal(false);
+      setShowFtthAppTransactionsModal(false);
       setShowRenewalModal(true);
     } catch (err: unknown) {
       showError('مزامنة التفعيل', ApiService.showError(err));
@@ -3346,17 +3428,17 @@ const SubscribersPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAutoSyncClick}
-                disabled={ftthCompareMutation.isPending || synchronizationFtthMutation.isPending}
+                disabled={ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending}
                 className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] touch-manipulation border border-gray-300 dark:border-gray-600"
               >
-                <RefreshCw className={`h-4 w-4 ${ftthCompareMutation.isPending || synchronizationFtthMutation.isPending ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending ? 'animate-spin' : ''}`} />
                 <span>
-                  {ftthCompareMutation.isPending || synchronizationFtthMutation.isPending
+                  {ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending
                     ? 'جاري المزامنة...'
                     : 'مزامنة تلقائيا'}
                 </span>
               </button>
-              {!ftthCompareMutation.isPending && !synchronizationFtthMutation.isPending && !!ftthCompareResult && (
+              {!ftthCompareMutation.isPending && !ftthAppTransactionsMutation.isPending && !synchronizationFtthMutation.isPending && !!ftthCompareResult && (
                 <button
                   type="button"
                   onClick={() => setShowFtthCompareModal(true)}
@@ -3368,7 +3450,19 @@ const SubscribersPage: React.FC = () => {
                   </span>
                 </button>
               )}
-              {!ftthCompareMutation.isPending && !synchronizationFtthMutation.isPending && !ftthCompareResult && !!autoSyncFtthResult && (
+              {!ftthCompareMutation.isPending && !ftthAppTransactionsMutation.isPending && !synchronizationFtthMutation.isPending && !ftthCompareResult && !autoSyncFtthResult && !!ftthAppTransactionsResult && (
+                <button
+                  type="button"
+                  onClick={() => setShowFtthAppTransactionsModal(true)}
+                  className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-teal-50 dark:bg-teal-900/20 hover:bg-teal-100 dark:hover:bg-teal-900/30 text-teal-700 dark:text-teal-200 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] touch-manipulation border border-teal-200 dark:border-teal-800"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>
+                    عرض محفظة الزبون ({ftthAppTransactionsResult.count ?? ftthAppTransactionsResult.totalCount ?? ftthAppTransactionsResult.items?.length ?? 0})
+                  </span>
+                </button>
+              )}
+              {!ftthCompareMutation.isPending && !ftthAppTransactionsMutation.isPending && !synchronizationFtthMutation.isPending && !ftthCompareResult && !!autoSyncFtthResult && (
                 <button
                   type="button"
                   onClick={() => setShowAutoSyncModal(true)}
@@ -5745,6 +5839,145 @@ const SubscribersPage: React.FC = () => {
         </div>
       )}
 
+      {showFtthSyncTypeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">نوع مزامنة FTTH</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+              اختر مصدر التفعيلات التي تريد جلبها ومزامنتها.
+            </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFtthSyncTypeModal(false);
+                  openFtthCompareForm({
+                    regionId: ftthCompareRegionId || undefined,
+                    resellerId: ftthCompareResellerId || undefined,
+                  });
+                }}
+                className="w-full text-right px-4 py-4 rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-300 transition-colors"
+              >
+                <span className="block font-semibold text-gray-900 dark:text-white">مزامنة تفعيلات من الرصيد</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  مقارنة اشتراكات FTTH المدفوعة من رصيد الوكيل مع النظام المحلي.
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFtthSyncTypeModal(false);
+                  openFtthWalletForm({
+                    regionId: ftthCompareRegionId || undefined,
+                    resellerId: ftthCompareResellerId || undefined,
+                  });
+                }}
+                className="w-full text-right px-4 py-4 rounded-xl border border-teal-200 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
+              >
+                <span className="block font-semibold text-gray-900 dark:text-white">مزامنة تفعيلات من محفظة الزبون</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  مقارنة معاملات محفظة المشترك/التطبيق مع النظام المحلي.
+                </span>
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowFtthSyncTypeModal(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFtthWalletFormModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">محفظة الزبون — مقارنة التفعيلات</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              اختر المنطقة والرسيلر وعدد الأيام لمقارنة تفعيلات محفظة المشترك/التطبيق مع النظام.
+            </p>
+            <div className="space-y-4">
+              {myRegions.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">المنطقة</label>
+                  <select
+                    value={ftthCompareRegionId}
+                    onChange={(e) => {
+                      const nextRegion = e.target.value;
+                      setFtthCompareRegionId(nextRegion);
+                      const nextResellers = filterResellersByRegion(ftthResellersForCompare, nextRegion);
+                      setFtthCompareResellerId((prev) =>
+                        nextResellers.some((r) => r.id === prev) ? prev : nextResellers[0]?.id ?? '',
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                  >
+                    <option value="">كل المناطق</option>
+                    {myRegions.map((region) => (
+                      <option key={region.id} value={region.id}>
+                        {region.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الرسيلر</label>
+                <select
+                  value={ftthCompareResellerId}
+                  onChange={(e) => setFtthCompareResellerId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  <option value="">اختر الرسيلر</option>
+                  {ftthCompareResellersFiltered.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                      {r.regionName ? ` — ${r.regionName}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">عدد الأيام</label>
+                <select
+                  value={ftthCompareDays}
+                  onChange={(e) => setFtthCompareDays(Number(e.target.value) || 7)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  {[3, 7, 14, 21, 30].map((d) => (
+                    <option key={d} value={d}>
+                      {d} يوم
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFtthWalletFormModal(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={!ftthCompareResellerId || ftthAppTransactionsMutation.isPending}
+                onClick={() => ftthAppTransactionsMutation.mutate()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg disabled:opacity-60"
+              >
+                {ftthAppTransactionsMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
+                بدء المقارنة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showFtthCompareFormModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
@@ -6012,6 +6245,130 @@ const SubscribersPage: React.FC = () => {
                 type="button"
                 onClick={() => setShowFtthCompareModal(false)}
                 className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md text-gray-700 dark:text-gray-200"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFtthAppTransactionsModal && ftthAppTransactionsResult && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
+          <div className="w-[98vw] max-w-[1400px] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">مقارنة محفظة الزبون / التطبيق</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {ftthAppTransactionsResult.count ?? ftthAppTransactionsResult.totalCount ?? ftthAppTransactionsResult.items?.length ?? 0} تفعيل
+                  {ftthAppTransactionsResult.name ? ` · ${ftthAppTransactionsResult.name}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFtthAppTransactionsModal(false)}
+                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                aria-label="إغلاق"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="overflow-auto bg-gray-50/40 dark:bg-gray-900/20 flex-1">
+              <table className="min-w-[1400px] w-full text-sm text-right border-separate border-spacing-0">
+                <thead className="bg-white/95 dark:bg-gray-800/95 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-4 py-3 border-b font-semibold">اسم المشترك</th>
+                    <th className="px-4 py-3 border-b font-semibold">اسم المستخدم</th>
+                    <th className="px-4 py-3 border-b font-semibold">الباقة</th>
+                    <th className="px-4 py-3 border-b font-semibold">السعر</th>
+                    <th className="px-4 py-3 border-b font-semibold">تفعيل التطبيق</th>
+                    <th className="px-4 py-3 border-b font-semibold">انتهاء التطبيق</th>
+                    <th className="px-4 py-3 border-b font-semibold">تفعيل محلي</th>
+                    <th className="px-4 py-3 border-b font-semibold">انتهاء محلي</th>
+                    <th className="px-4 py-3 border-b font-semibold">طريقة الدفع</th>
+                    <th className="px-4 py-3 border-b font-semibold">عدد التفعيلات</th>
+                    <th className="px-4 py-3 border-b font-semibold">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(ftthAppTransactionsResult.items ?? []).length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="px-4 py-10 text-center text-gray-500">
+                        لا توجد تفعيلات في هذه الفترة.
+                      </td>
+                    </tr>
+                  ) : (
+                    (ftthAppTransactionsResult.items ?? []).map((item, idx) => {
+                      const compareRow = mapFtthAppTransactionToCompareItem(item);
+                      const mismatch = ftthCompareRowHasMismatch(compareRow);
+                      const username = (item.username ?? '').trim();
+                      const isOpeningSync = openingFtthCompareRowIndex === idx;
+                      const isSynced = activatedFtthCompareRowIndices.has(idx);
+                      return (
+                        <tr
+                          key={`${username || item.customerId}-${idx}`}
+                          className={`border-t even:bg-white odd:bg-gray-50/70 dark:even:bg-gray-800/40 ${
+                            mismatch ? 'bg-amber-50/80 dark:bg-amber-900/15' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3">{item.customerName || '—'}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{username || '—'}</td>
+                          <td className="px-4 py-3">{item.packageName || '—'}</td>
+                          <td className="px-4 py-3">{formatNumber(item.planPrice ?? 0, { suffix: ' د.ع' })}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.startsAt ? formatDate(item.startsAt, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.endsAt ? formatDate(item.endsAt, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.localActivation ? formatDate(item.localActivation, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {item.localExpiration ? formatDate(item.localExpiration, FTTH_COMPARE_DATE_OPTIONS) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {item.paymentType ? (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${ftthComparePaymentBadgeClass(item.paymentType)}`}>
+                                {ftthComparePaymentLabel(item.paymentType)}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-center">{item.activationCount ?? 1}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              disabled={isOpeningSync || !username}
+                              onClick={() =>
+                                openRenewalModalForFtthCompareRow(
+                                  compareRow,
+                                  idx,
+                                  { walletSync: true },
+                                )
+                              }
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-60"
+                            >
+                              {isOpeningSync ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
+                              مزامنة
+                            </button>
+                            {isSynced && (
+                              <span className="block mt-1 text-[11px] text-emerald-600">تمت المزامنة</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="px-5 py-4 border-t flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowFtthAppTransactionsModal(false)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md"
               >
                 إغلاق
               </button>
@@ -6305,7 +6662,10 @@ const SubscribersPage: React.FC = () => {
                     if (r.serviceType === ServiceType.Sas) {
                       synchronizationFtthMutation.mutate(r);
                     } else {
-                      openFtthCompareForm({ regionId: r.regionId || '', resellerId: r.id });
+                      setFtthCompareRegionId(r.regionId || '');
+                      setFtthCompareResellerId(r.id);
+                      setFtthComparePartnerId(resolveFtthComparePartnerId(ftthResellersForCompare, r.id));
+                      setShowFtthSyncTypeModal(true);
                     }
                   }}
                   className="w-full flex items-center justify-between gap-3 px-4 py-3 text-right rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-300 dark:hover:border-primary-700 transition-colors"
