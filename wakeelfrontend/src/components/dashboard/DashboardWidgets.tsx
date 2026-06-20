@@ -1,5 +1,6 @@
 import React from 'react';
-import { MapPin, RefreshCw, Users } from 'lucide-react';
+import { RefreshCw, Users } from 'lucide-react';
+import OperationalFiltersBar from '../filters/OperationalFiltersBar';
 import { WakeelBadge } from '../table/WakeelBadge';
 import {
   AgentRegion,
@@ -9,15 +10,6 @@ import {
   EmployeeTaskType,
   RenewalReceipt,
 } from '../../types';
-
-export const filterChipBase =
-  'flex items-center gap-2.5 px-4 py-3 rounded-xl border text-right transition-all min-w-[132px] shrink-0';
-export const filterChipInactive =
-  'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 hover:border-primary-300 hover:shadow-sm';
-export const filterChipRegionActive =
-  'bg-primary-600 border-primary-600 text-white shadow-md shadow-primary-500/25';
-export const filterChipResellerActive =
-  'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/25';
 
 export const dashPanel =
   'bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700';
@@ -103,91 +95,14 @@ export const DashboardRegionResellerFilters: React.FC<DashboardRegionResellerFil
   showRegions,
   showResellers,
 }) => (
-  <div className="space-y-3">
-    {showRegions && (
-      <div>
-        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-          <MapPin className="h-4 w-4 text-primary-600 dark:text-primary-400" />
-          <span>فلترة المناطق</span>
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => onRegionClick('')}
-            className={`${filterChipBase} ${
-              !selectedRegionId ? filterChipRegionActive : filterChipInactive
-            }`}
-          >
-            <MapPin className={`h-4 w-4 shrink-0 ${!selectedRegionId ? 'text-white' : 'text-primary-500'}`} />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">الكل</div>
-              <div className={`text-xs truncate ${!selectedRegionId ? 'text-white/80' : 'opacity-70'}`}>
-                كل المناطق
-              </div>
-            </div>
-          </button>
-          {regions.map((region) => {
-            const active = selectedRegionId === region.id;
-            return (
-              <button
-                key={region.id}
-                type="button"
-                onClick={() => onRegionClick(region.id)}
-                className={`${filterChipBase} ${active ? filterChipRegionActive : filterChipInactive}`}
-              >
-                <MapPin className={`h-4 w-4 shrink-0 ${active ? 'text-white' : 'text-primary-500'}`} />
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{region.name}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    )}
-
-    {showResellers && (
-      <div>
-        <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-          <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span>فلترة الرسيلرز</span>
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => onResellerClick('')}
-            className={`${filterChipBase} ${
-              !selectedResellerId ? filterChipResellerActive : filterChipInactive
-            }`}
-          >
-            <MapPin className={`h-4 w-4 shrink-0 ${!selectedResellerId ? 'text-white' : 'text-emerald-500'}`} />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold truncate">الكل</div>
-              <div className={`text-xs truncate ${!selectedResellerId ? 'text-white/80' : 'opacity-70'}`}>
-                كل الرسيلرز
-              </div>
-            </div>
-          </button>
-          {resellers.map((reseller) => {
-            const active = selectedResellerId === reseller.id;
-            return (
-              <button
-                key={reseller.id}
-                type="button"
-                onClick={() => onResellerClick(reseller.id)}
-                className={`${filterChipBase} ${active ? filterChipResellerActive : filterChipInactive}`}
-              >
-                <MapPin className={`h-4 w-4 shrink-0 ${active ? 'text-white' : 'text-emerald-500'}`} />
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{reseller.name}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    )}
-  </div>
+  <OperationalFiltersBar
+    regions={showRegions ? regions : []}
+    resellers={showResellers ? resellers : []}
+    selectedRegionId={selectedRegionId}
+    selectedResellerId={selectedResellerId}
+    onRegionSelect={onRegionClick}
+    onResellerSelect={onResellerClick}
+  />
 );
 
 interface SummaryCardProps {

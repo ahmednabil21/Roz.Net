@@ -5,16 +5,18 @@ type ListPageWithFiltersProps = {
   children: React.ReactNode;
 };
 
-/** تخطيط قائمة: المحتوى + شريط فلترة المناطق/الرسيلرز على يمين الصفحة (RTL). */
+/** تخطيط قائمة: فلترة المناطق/الرسيلرز أفقياً فوق المحتوى. */
 const ListPageWithFilters: React.FC<ListPageWithFiltersProps> = ({ sidebar, children }) => {
   if (!sidebar) {
     return <>{children}</>;
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[11.5rem_minmax(0,1fr)] gap-4 items-start">
-      <div className="order-1 xl:order-none">{sidebar}</div>
-      <div className="min-w-0 order-2 xl:order-none">{children}</div>
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/80 dark:bg-gray-900/50 backdrop-blur-sm shadow-sm p-3 sm:p-4">
+        {sidebar}
+      </div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 };

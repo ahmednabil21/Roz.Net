@@ -1,7 +1,26 @@
 import type { AgentReseller } from '../types';
+import { ServiceType } from '../types';
 
 export const OPERATIONAL_REGION_STORAGE_KEY = 'selectedOperationalRegionId';
 export const OPERATIONAL_RESELLER_STORAGE_KEY = 'selectedOperationalResellerId';
+
+/** أنماط موحّدة لشرائح فلترة المناطق/الرسيلرز (أفقي) */
+export const OPERATIONAL_FILTER_CHIP_BASE =
+  'flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-right transition-all min-w-[120px] shrink-0';
+export const OPERATIONAL_FILTER_CHIP_INACTIVE =
+  'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 hover:border-primary-300 hover:shadow-sm';
+export const OPERATIONAL_FILTER_CHIP_REGION_ACTIVE =
+  'bg-primary-600 border-primary-600 text-white shadow-md shadow-primary-500/25';
+export const OPERATIONAL_FILTER_CHIP_RESELLER_ACTIVE =
+  'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/25';
+export const OPERATIONAL_FILTER_ROW =
+  'flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin';
+
+export function getResellerServiceTypeLabel(serviceType?: ServiceType): string {
+  if (serviceType === ServiceType.Ftth) return 'FTTH';
+  if (serviceType === ServiceType.Sas) return 'SAS';
+  return 'Earthlink';
+}
 
 export interface RegionResellerFilterParams {
   regionId?: string;
