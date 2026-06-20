@@ -18,6 +18,7 @@ import {
   Building2,
   Eye,
   X,
+  DollarSign,
 } from 'lucide-react';
 import {
   type Subscriber,
@@ -33,15 +34,48 @@ import {
   SubscriptionStatus,
   SubscriptionType,
   PaymentStatus,
+  ActivationPaymentMethod,
+  AccountsLedgerEntry,
+  UserRole,
 } from '../types';
 import { apiService, ApiService } from '../services/api';
 import { showSuccess, showError } from '../utils/notifications';
 import { useDigits } from '../contexts/DigitsContext';
+import { useAuth } from '../contexts/AuthContext';
 import Pagination from '../components/Pagination';
 import { hasOperationalWhatsAppSession } from '../utils/operationalFilters';
 
 const RENEWAL_PAGE_SIZE = 10;
 const MAINT_PAGE_SIZE = 10;
+const ACCOUNTS_PAGE_SIZE = 10;
+
+function accountsLedgerKindLabel(kind: string): string {
+  if (kind === 'Renewal') return 'تفعيل';
+  if (kind === 'DebtPayment') return 'تسديد دين';
+  return kind;
+}
+
+function accountsPaymentMethodLabel(pm?: number | null): string {
+  if (Number(pm) === ActivationPaymentMethod.Cash) return 'كاش';
+  if (Number(pm) === ActivationPaymentMethod.Master) return 'ماستر';
+  if (Number(pm) === ActivationPaymentMethod.Deferred) return 'آجل';
+  if (Number(pm) === ActivationPaymentMethod.CustomerWallet) return 'محفظة زبون';
+  return '—';
+}
+
+function isAccountsRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & {
+  kind: 'Renewal';
+  profileName?: string;
+  paymentMethod?: number;
+  nationalSubscriptionCost?: number;
+  balanceDeductionAmount?: number;
+  serviceFeesAmount?: number;
+  activationProfit?: number;
+  totalProfit?: number;
+  receiptNumber?: string;
+} {
+  return row.kind === 'Renewal';
+}
 
 function getWhatsAppReminderErrorMessage(err: unknown): string {
   const msg = ApiService.showError(err);
@@ -128,16 +162,22 @@ function WhatsAppTypeBadge({
 const SubscriberDetailsPage: React.FC = () => {
   const { subscriberId } = useParams<{ subscriberId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { formatNumber, formatDate } = useDigits();
   const [renewalPage, setRenewalPage] = useState(1);
   const [maintPage, setMaintPage] = useState(1);
+  const [accountsPage, setAccountsPage] = useState(1);
   const [reminderSending, setReminderSending] = useState(false);
   const [selectedTask, setSelectedTask] = useState<EmployeeTask | null>(null);
   const [taskLoadingId, setTaskLoadingId] = useState<string | null>(null);
 
+  const canAccessAccounts =
+    user?.role !== UserRole.Employee || user?.canAccessAccounts !== false;
+
   useEffect(() => {
     setRenewalPage(1);
     setMaintPage(1);
+    setAccountsPage(1);
   }, [subscriberId]);
 
   const {
@@ -176,6 +216,21 @@ const SubscriberDetailsPage: React.FC = () => {
     subscriber?.agentResellerId,
     myAgent?.whatsAppSessionId
   );
+
+  const {
+    data: accountsData,
+    isLoading: accountsLoading,
+    isFetching: accountsFetching,
+  } = useQuery({
+    queryKey: ['subscriber-accounts', subscriberId, accountsPage, subscriber?.username],
+    queryFn: () =>
+      apiService.getAccounts({
+        subscriberName: subscriber!.username,
+        page: accountsPage,
+        pageSize: ACCOUNTS_PAGE_SIZE,
+      }),
+    enabled: !!subscriberId && !!subscriber?.username && canAccessAccounts,
+  });
 
   const sortedMaintenanceRecords = useMemo(() => {
     const list = [...(subscriber?.maintenanceRecords ?? [])];
@@ -325,6 +380,10 @@ const SubscriberDetailsPage: React.FC = () => {
   const renewalData = renewalsPageData?.data ?? [];
   const renewalTotalItems = renewalsPageData?.totalItems ?? 0;
   const renewalTotalPages = Math.max(1, renewalsPageData?.totalPages ?? 1);
+
+  const accountsRows = accountsData?.ledger?.data ?? [];
+  const accountsTotalItems = accountsData?.ledger?.totalItems ?? 0;
+  const accountsTotalPages = Math.max(1, accountsData?.ledger?.totalPages ?? 1);
   const openTaskDetails = async (taskId: string) => {
     if (!subscriberId || !taskId) return;
     setTaskLoadingId(taskId);
@@ -823,6 +882,136 @@ const SubscriberDetailsPage: React.FC = () => {
               )}
             </div>
           </section>
+
+          {canAccessAccounts && (
+            <section className="scroll-mt-24">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 text-sm font-bold">
+                  4
+                </span>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">سجل الحسابات</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">تفعيلات وتسديد ديون المشترك كما في صفحة الحسابات</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white dark:bg-gray-900/40 shadow-sm overflow-hidden">
+                {accountsLoading && accountsPage === 1 ? (
+                  <div className="flex flex-col items-center py-16">
+                    <RefreshCw className="h-8 w-8 animate-spin text-emerald-500 mb-2" />
+                    <p className="text-sm text-gray-500">جاري تحميل سجل الحسابات...</p>
+                  </div>
+                ) : accountsRows.length === 0 && !accountsFetching ? (
+                  <div className="text-center py-16 px-4">
+                    <DollarSign className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+                    <p className="text-gray-700 dark:text-gray-300 font-medium">لا يوجد سجل حسابات</p>
+                    <p className="text-sm text-gray-500 mt-1">لم تُسجَّل عمليات مالية لهذا المشترك بعد.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="wakeel-table-scroll overflow-x-auto">
+                      <table className="min-w-[1200px] w-full text-right text-sm">
+                        <thead>
+                          <tr className="bg-emerald-50/80 dark:bg-emerald-950/20 border-b border-gray-200 dark:border-gray-700">
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">النوع</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400">الباقة</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">طريقة الدفع</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">كلفة الوكيل</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">واصل اشتراك</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">استقطاع الرصيد</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">وارد عام</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">الأجور</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">الكاشباك</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">الربح الكلي</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">تاريخ العملية</th>
+                            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">رقم الفاتورة</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {accountsRows.map((row) => {
+                            const renewal = isAccountsRenewalEntry(row) ? row : null;
+                            return (
+                              <tr
+                                key={`${row.kind}-${row.id}`}
+                                className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition-colors"
+                              >
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <span
+                                    className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                                      row.kind === 'Renewal'
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
+                                    }`}
+                                  >
+                                    {accountsLedgerKindLabel(row.kind)}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-gray-800 dark:text-gray-200">{renewal?.profileName || '—'}</td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {renewal ? accountsPaymentMethodLabel(renewal.paymentMethod) : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                                  {renewal ? formatNumber(row.amount ?? 0, { suffix: ' د.ع' }) : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                                  {renewal?.nationalSubscriptionCost != null
+                                    ? formatNumber(renewal.nationalSubscriptionCost, { suffix: ' د.ع' })
+                                    : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums text-red-700 dark:text-red-300">
+                                  {renewal?.balanceDeductionAmount != null
+                                    ? formatNumber(renewal.balanceDeductionAmount, { suffix: ' د.ع' })
+                                    : renewal
+                                      ? formatNumber(0, { suffix: ' د.ع' })
+                                      : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums font-medium">
+                                  {formatNumber(row.generalIncome ?? 0, { suffix: ' د.ع' })}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                                  {renewal?.serviceFeesAmount != null
+                                    ? formatNumber(renewal.serviceFeesAmount, { suffix: ' د.ع' })
+                                    : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                                  {renewal?.activationProfit != null
+                                    ? formatNumber(renewal.activationProfit, { suffix: ' د.ع' })
+                                    : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                                  {renewal?.totalProfit != null
+                                    ? formatNumber(renewal.totalProfit, { suffix: ' د.ع' })
+                                    : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {row.renewalDate ? formatDate(row.renewalDate) : '—'}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">
+                                  {renewal?.receiptNumber || '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {accountsTotalItems > ACCOUNTS_PAGE_SIZE && (
+                      <Pagination
+                        currentPage={accountsPage}
+                        totalPages={accountsTotalPages}
+                        totalItems={accountsTotalItems}
+                        pageSize={ACCOUNTS_PAGE_SIZE}
+                        hasNextPage={accountsPage < accountsTotalPages}
+                        hasPreviousPage={accountsPage > 1}
+                        onPageChange={setAccountsPage}
+                        className="rounded-b-2xl"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          )}
 
           {selectedTask && (
             <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] flex items-center justify-center p-4">

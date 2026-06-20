@@ -6,8 +6,8 @@ const HEALTH_CHECK_INTERVAL_MS = 30_000;
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
 
 /**
- * حالة الاتصال: navigator.onLine + طلب دوري عبر نفس axios (GET /users/me).
- * استخدام apiService.healthCheck() يضمن نفس الـ baseURL والـ CORS والـ auth.
+ * حالة الاتصال: navigator.onLine + طلب دوري خفيف (GET /wakeel/health).
+ * استخدام apiService.healthCheck() يضمن نفس أصل الـ API دون استدعاء GET /users/me.
  */
 export function useNetworkStatus() {
   const [online, setOnline] = useState(

@@ -54,6 +54,7 @@ const SUBSCRIBERS_TABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'secruptionId', label: 'معرف الاشتراك' },
   { id: 'subscriber', label: 'المشترك (الاسم)' },
   { id: 'username', label: 'اسم المستخدم' },
+  { id: 'agentReseller', label: 'الرسيلر' },
   { id: 'subscriberRegion', label: 'منطقة المشترك' },
   { id: 'phoneNumber', label: 'رقم الهاتف' },
   { id: 'agentCompanyName', label: 'شركة الوكيل' },
@@ -616,6 +617,22 @@ const SubscribersPage: React.FC = () => {
       };
     }
     return { name: regionName, badgeClass: pickRegionBadgeColor(regionName.toLowerCase()) };
+  };
+
+  const getResellerBadge = (subscriber: Subscriber) => {
+    const name =
+      (subscriber.agentResellerName ?? '').trim() ||
+      myResellers.find((r) => r.id === subscriber.agentResellerId)?.name?.trim() ||
+      '';
+    if (!name) return <span className="text-gray-400">—</span>;
+    const key = (subscriber.agentResellerId || name).toLowerCase();
+    return (
+      <span
+        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border ${pickRegionBadgeColor(key)}`}
+      >
+        {name}
+      </span>
+    );
   };
 
   // Form state for adding new subscriber
@@ -3766,6 +3783,9 @@ const SubscribersPage: React.FC = () => {
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('username')}`}>
                   اسم المستخدم
                 </th>
+                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('agentReseller')}`}>
+                  الرسيلر
+                </th>
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('subscriberRegion')}`}>
                   منطقة المشترك
                 </th>
@@ -3834,8 +3854,18 @@ const SubscribersPage: React.FC = () => {
                       {subscriber.fullName || '—'}
                     </div>
                   </td>
-                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('username')}`}>
-                    {subscriber.username}
+                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${col('username')}`}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/subscribers/${subscriber.id}`)}
+                      className="font-medium text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 hover:underline"
+                      title="عرض تفاصيل المشترك"
+                    >
+                      {subscriber.username}
+                    </button>
+                  </td>
+                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap ${col('agentReseller')}`}>
+                    {getResellerBadge(subscriber)}
                   </td>
                   <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap ${col('subscriberRegion')}`}>
                     {(() => {

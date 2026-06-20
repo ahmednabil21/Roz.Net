@@ -349,10 +349,6 @@ const ReportsPage: React.FC = () => {
     setShowAdvancedFiltersModal(false);
   };
 
-  const handleApplyDateFilter = () => {
-    handleApplyFilters();
-  };
-
   const handleResetFilters = () => {
     setFromDate('');
     setToDate('');
@@ -377,37 +373,6 @@ const ReportsPage: React.FC = () => {
 
   const renderAdvancedFiltersForm = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">من تاريخ</label>
-        <input
-          type="date"
-          value={fromDate}
-          max={toDate || undefined}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">إلى تاريخ</label>
-        <input
-          type="date"
-          value={toDate}
-          min={fromDate || undefined}
-          onChange={(e) => setToDate(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">اترك الحقلين فارغين لعرض كل السجلات (الأحدث أولاً)</p>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">اسم المشترك</label>
-        <input
-          type="text"
-          value={subscriberName}
-          onChange={(e) => setSubscriberName(e.target.value)}
-          placeholder="بحث بالاسم..."
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-        />
-      </div>
       <div>
         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">نوع الباقة</label>
         <select
@@ -509,7 +474,7 @@ const ReportsPage: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">الحسابات</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -538,55 +503,6 @@ const ReportsPage: React.FC = () => {
               ))}
             </select>
           )}
-          <div className="flex flex-wrap items-end gap-2 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-md bg-white/80 dark:bg-gray-800/80">
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">من</label>
-              <input
-                type="date"
-                value={fromDate}
-                max={toDate || undefined}
-                onChange={(e) => setFromDate(e.target.value)}
-                disabled={isAdmin && !selectedAgentId}
-                className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-0.5">إلى</label>
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate || undefined}
-                onChange={(e) => setToDate(e.target.value)}
-                disabled={isAdmin && !selectedAgentId}
-                className="px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleApplyDateFilter}
-              disabled={isAdmin && !selectedAgentId}
-              className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm disabled:opacity-50"
-            >
-              تطبيق
-            </button>
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              disabled={isAdmin && !selectedAgentId}
-              className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-md text-sm disabled:opacity-50"
-              title="كل الفترة"
-            >
-              الكل
-            </button>
-            <button
-              type="button"
-              onClick={handleLast30DaysFilter}
-              disabled={isAdmin && !selectedAgentId}
-              className="px-3 py-1.5 text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md text-sm disabled:opacity-50"
-            >
-              30 يوم
-            </button>
-          </div>
           <button
             type="button"
             onClick={() => setShowAdvancedFiltersModal(true)}
@@ -594,7 +510,10 @@ const ReportsPage: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md text-sm backdrop-blur-sm disabled:opacity-50"
           >
             <SlidersHorizontal className="h-4 w-4" />
-            <span>الفلترة المتقدمة</span>
+            <span>فلترة متقدمة</span>
+            {(appliedPackageType || appliedExecutedByUserId) && (
+              <span className="inline-flex h-2 w-2 rounded-full bg-primary-500" aria-hidden />
+            )}
           </button>
           <button
             type="button"
@@ -615,6 +534,81 @@ const ReportsPage: React.FC = () => {
             <span>تحديث</span>
           </button>
         </div>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 bg-white/70 dark:bg-gray-900/40 backdrop-blur-sm p-4 shadow-sm">
+        <div className="flex flex-col xl:flex-row xl:items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">بحث عن المشترك</label>
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={subscriberName}
+                onChange={(e) => setSubscriberName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleApplyFilters();
+                }}
+                placeholder="الاسم أو اسم المستخدم..."
+                disabled={isAdmin && !selectedAgentId}
+                className="w-full pr-9 pl-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">من تاريخ</label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => setFromDate(e.target.value)}
+              disabled={isAdmin && !selectedAgentId}
+              className="w-full min-w-[140px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">إلى تاريخ</label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => setToDate(e.target.value)}
+              disabled={isAdmin && !selectedAgentId}
+              className="w-full min-w-[140px] px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleApplyFilters}
+              disabled={isAdmin && !selectedAgentId}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm disabled:opacity-50"
+            >
+              <Search className="h-4 w-4" />
+              بحث
+            </button>
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              disabled={isAdmin && !selectedAgentId}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg text-sm disabled:opacity-50"
+            >
+              كل الفترة
+            </button>
+            <button
+              type="button"
+              onClick={handleLast30DaysFilter}
+              disabled={isAdmin && !selectedAgentId}
+              className="px-4 py-2 text-primary-700 dark:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg text-sm disabled:opacity-50"
+            >
+              آخر 30 يوم
+            </button>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          الفترة المعروضة: {formatAccountsDateRangeLabel(appliedFromDate, appliedToDate)}
+          {appliedSubscriberName.trim() ? ` — المشترك: «${appliedSubscriberName.trim()}»` : ''}
+        </p>
       </div>
 
       {isAdmin && !selectedAgentId ? (
@@ -692,79 +686,89 @@ const ReportsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4 mb-6">
-            <StatCard
-              title="الوارد الكلي"
-              value={accounts?.totalGeneralIncome ?? 0}
-              icon={DollarSign}
-              color="blue"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="واصل اشتراك"
-              value={accounts?.totalPackageIncome ?? 0}
-              icon={Wallet}
-              color="green"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="استقطاع رصيد المنطقة"
-              value={accounts?.totalBalanceDeduction ?? 0}
-              icon={ArrowDownLeft}
-              color="red"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="اقتطاع كلفة الوكيل"
-              value={accounts?.totalAgentPackageIncome ?? 0}
-              icon={CreditCard}
-              color="orange"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="وارد الأجور"
-              value={accounts?.totalServiceFeesIncome ?? 0}
-              icon={Coins}
-              color="teal"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="وارد الكاشباك"
-              value={accounts?.totalCashbackIncome ?? 0}
-              icon={Coins}
-              color="indigo"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="ديون اشتراك واصلة"
-              value={accounts?.totalPaidSubscriptionDebt ?? 0}
-              icon={CreditCard}
-              color="purple"
-              isAmount
-              glass
-            />
-            <StatCard 
-              title="ديون اشتراك غير واصلة"
-              value={accounts?.totalUnpaidSubscriptionDebt ?? 0}
-              icon={CreditCard}
-              color="red"
-              isAmount
-              glass
-            />
-            <StatCard
-              title="ديون الأجور"
-              value={accounts?.totalServiceFeesDebt ?? 0}
-              icon={CreditCard}
-              color="orange"
-              isAmount
-              glass
-            />
+          <div className="space-y-5 mb-6">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">الوارد والإيرادات</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+                <StatCard
+                  title="الوارد الكلي"
+                  value={accounts?.totalGeneralIncome ?? 0}
+                  icon={DollarSign}
+                  color="blue"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="واصل اشتراك"
+                  value={accounts?.totalPackageIncome ?? 0}
+                  icon={Wallet}
+                  color="green"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="وارد الأجور"
+                  value={accounts?.totalServiceFeesIncome ?? 0}
+                  icon={Coins}
+                  color="teal"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="وارد الكاشباك"
+                  value={accounts?.totalCashbackIncome ?? 0}
+                  icon={Coins}
+                  color="indigo"
+                  isAmount
+                  glass
+                />
+              </div>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">التكاليف والديون</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4">
+                <StatCard
+                  title="استقطاع رصيد المنطقة"
+                  value={accounts?.totalBalanceDeduction ?? 0}
+                  icon={ArrowDownLeft}
+                  color="red"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="اقتطاع كلفة الوكيل"
+                  value={accounts?.totalAgentPackageIncome ?? 0}
+                  icon={CreditCard}
+                  color="orange"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="ديون اشتراك واصلة"
+                  value={accounts?.totalPaidSubscriptionDebt ?? 0}
+                  icon={CreditCard}
+                  color="purple"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="ديون اشتراك غير واصلة"
+                  value={accounts?.totalUnpaidSubscriptionDebt ?? 0}
+                  icon={CreditCard}
+                  color="red"
+                  isAmount
+                  glass
+                />
+                <StatCard
+                  title="ديون الأجور"
+                  value={accounts?.totalServiceFeesDebt ?? 0}
+                  icon={CreditCard}
+                  color="orange"
+                  isAmount
+                  glass
+                />
+              </div>
+            </div>
           </div>
 
           {isLoading ? (
@@ -783,7 +787,7 @@ const ReportsPage: React.FC = () => {
                 <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">سجل الحسابات</h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    تفعيلات وتسديد ديون — {appliedFromDate} إلى {appliedToDate}
+                    تفعيلات وتسديد ديون — {formatAccountsDateRangeLabel(appliedFromDate, appliedToDate)}
                   </p>
                 </div>
                 <div className="wakeel-table-scroll">

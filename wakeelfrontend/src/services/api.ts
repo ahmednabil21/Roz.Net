@@ -619,10 +619,11 @@ class ApiService {
     return response.data;
   }
 
-  /** فحص خفيف للاتصال بالسيرفر (للوضع دون اتصال) — مهلة قصيرة لتفادي انتظار 30s */
+  /** فحص خفيف للاتصال بالسيرفر (للوضع دون اتصال) — GET /wakeel/health بدون استدعاء /users/me */
   async healthCheck(timeoutMs = 10_000): Promise<void> {
-    /** لا نفعّل إعادة توجيه 401 هنا — بعض الأدوار قد لا يدعمها /users/me بينما الجلسة صالحة */
-    await this.api.get('/users/me', { timeout: timeoutMs, skipAuthRedirect: true });
+    const base = (this.api.defaults.baseURL || '').replace(/\/+$/, '');
+    const healthUrl = base.replace(/\/api$/i, '/health');
+    await axios.get(healthUrl, { timeout: timeoutMs });
   }
 
   async getAllUsers(params?: PaginationParams): Promise<PaginatedResponse<User>> {

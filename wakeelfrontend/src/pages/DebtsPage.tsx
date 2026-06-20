@@ -804,6 +804,7 @@ const DebtsPage: React.FC = () => {
           };
         }
       );
+      queryClient.invalidateQueries({ queryKey: ['debts'] });
       queryClient.invalidateQueries({ queryKey: ['debt-totals'] });
       setShowPayDebtModal(false);
       setSelectedDebt(null);
