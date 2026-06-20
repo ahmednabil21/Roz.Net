@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiService, ApiService } from '../services/api';
 import { StatCard } from '../components/StatCard';
@@ -20,8 +20,6 @@ import {
   ProfilePackageType,
   User,
   UserRole,
-  AgentReseller,
-  AgentRegion,
 } from '../types';
 import { showError, showSuccess } from '../utils/notifications';
 import {
@@ -35,7 +33,6 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   Trash2,
   Wallet,
   X,

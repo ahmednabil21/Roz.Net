@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService, ApiService } from '../services/api';
-import { Debt, DebtCreateRequest, DebtUpdateRequest, DebtPaymentRequest, UserRole, PaginatedResponse, DebtsListResponse, Subscriber, DebtStatus, DebtsListParams, ServiceType, EARTHLINK_USER_MANAGEMENT_URL, DebtOffOn, AgentReseller, AgentRegion } from '../types';
+import { Debt, DebtCreateRequest, DebtUpdateRequest, DebtPaymentRequest, UserRole, PaginatedResponse, DebtsListResponse, Subscriber, DebtStatus, DebtsListParams, ServiceType, EARTHLINK_USER_MANAGEMENT_URL, DebtOffOn } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
@@ -19,7 +19,6 @@ import {
 } from '../utils/operationalFilters';
 import { createXlsxBlob } from '../utils/excelExport';
 import { 
-  Search, 
   CreditCard,
   DollarSign,
   Plus,
@@ -33,7 +32,6 @@ import {
   CheckSquare,
   Square,
   FileSpreadsheet,
-  SlidersHorizontal,
   Check,
   Power
 } from 'lucide-react';

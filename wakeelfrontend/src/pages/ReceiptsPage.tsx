@@ -11,7 +11,7 @@ import { showSuccess, showError } from '../utils/notifications';
 import {
   buildRegionResellerFilterParams,
 } from '../utils/operationalFilters';
-import { RenewalReceipt, PaymentStatus, UserRole } from '../types';
+import { RenewalReceipt, UserRole } from '../types';
 import { WakeelBadge } from '../components/table/WakeelBadge';
 import { formatReceiptPrintDate, resolveReceiptPrintAmounts } from '../utils/receiptPrint';
 import {
@@ -28,7 +28,6 @@ import { useOperationalFilters } from '../hooks/useOperationalFilters';
 import QRCode from 'qrcode';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { 
-  Search, 
   Receipt,
   User,
   Eye,
@@ -562,17 +561,6 @@ const ReceiptsPage: React.FC = () => {
     }
   };
   void _testDirectAPI;
-
-  const getPaymentStatusBadge = (status: PaymentStatus) => {
-    const statusConfig = {
-      [PaymentStatus.Paid]: { text: 'مدفوع', color: 'success' as const },
-      [PaymentStatus.Unpaid]: { text: 'غير مدفوع', color: 'error' as const },
-      [PaymentStatus.Pending]: { text: 'معلق', color: 'warning' as const },
-      [PaymentStatus.Unknown]: { text: 'غير محدد', color: 'gray' as const },
-    };
-    const config = statusConfig[status] ?? statusConfig[PaymentStatus.Unknown];
-    return <WakeelBadge color={config.color}>{config.text}</WakeelBadge>;
-  };
 
   if (error) {
     return (
