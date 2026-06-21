@@ -69,6 +69,8 @@ import {
   ActivityType,
   AgentEmployeeCreateRequest,
   AgentEmployeeUpdateRequest,
+  EmployeePermissionCatalog,
+  EmployeePagePermissionSet,
   UserRole,
   SystemMessageResponse,
   SystemMessageCreateRequest,
@@ -590,11 +592,33 @@ class ApiService {
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response: AxiosResponse<LoginResponse> = await this.api.post('/Auth/login', credentials, {
-      timeout: 60000, // مهلة أطول لتسجيل الدخول (قد يكون السيرفر في بداية تشغيل)
-      skipAuthRedirect: true, // فشل الدخول (401) لا يعيد تحميل صفحة /login
+    const response: AxiosResponse<Record<string, unknown>> = await this.api.post('/Auth/login', credentials, {
+      timeout: 60000,
+      skipAuthRedirect: true,
     });
-    return response.data;
+    const raw = response.data ?? {};
+    const pagePermissionsRaw = (raw.pagePermissions ?? raw.PagePermissions ?? []) as Array<Record<string, unknown>>;
+    const pagePermissions: EmployeePagePermissionSet[] = pagePermissionsRaw
+      .map((s) => ({
+        page: String(s.page ?? s.Page ?? ''),
+        actions: ((s.actions ?? s.Actions ?? []) as string[]).map(String),
+      }))
+      .filter((s) => s.page && s.actions.length > 0);
+
+    return {
+      token: String(raw.token ?? raw.Token ?? ''),
+      expiresInSeconds: Number(raw.expiresInSeconds ?? raw.ExpiresInSeconds ?? 0),
+      role: String(raw.role ?? raw.Role ?? ''),
+      roleId: raw.roleId != null ? Number(raw.roleId) : raw.RoleId != null ? Number(raw.RoleId) : undefined,
+      tenantPlanType: (raw.tenantPlanType ?? raw.TenantPlanType) as LoginResponse['tenantPlanType'],
+      standardPlanTierId: (raw.standardPlanTierId ?? raw.StandardPlanTierId) as LoginResponse['standardPlanTierId'],
+      standardPlanTier: (raw.standardPlanTier ?? raw.StandardPlanTier) as LoginResponse['standardPlanTier'],
+      maxResellers: (raw.maxResellers ?? raw.MaxResellers) as LoginResponse['maxResellers'],
+      skipAgentsMeAndSync: !!(raw.skipAgentsMeAndSync ?? raw.SkipAgentsMeAndSync),
+      pendingEmployeeTasksCount: Number(raw.pendingEmployeeTasksCount ?? raw.PendingEmployeeTasksCount ?? 0),
+      errorMessage: (raw.errorMessage ?? raw.ErrorMessage) as string | null | undefined,
+      pagePermissions: pagePermissions.length > 0 ? pagePermissions : undefined,
+    };
   }
 
   /** GET /me/features — صلاحيات Features للمستخدم الحالي */
@@ -621,7 +645,20 @@ class ApiService {
     const response: AxiosResponse<User> = await this.api.get('/users/me', {
       ...(opts?.skipAuthRedirect ? { skipAuthRedirect: true } : {}),
     });
-    return response.data;
+    return this.normalizeUserPagePermissions(response.data);
+  }
+
+  private normalizeUserPagePermissions(user: User): User {
+    const raw = user as User & { PagePermissions?: EmployeePagePermissionSet[] };
+    const sets = user.pagePermissions ?? raw.PagePermissions;
+    if (!sets?.length) return user;
+    return {
+      ...user,
+      pagePermissions: sets.map((s) => ({
+        page: s.page,
+        actions: s.actions ?? [],
+      })),
+    };
   }
 
   /** فحص خفيف للاتصال بالسيرفر (للوضع دون اتصال) — GET /wakeel/health بدون استدعاء /users/me */
@@ -1161,7 +1198,7 @@ class ApiService {
   /** موظفو الوكيل الحالي (Agent) */
   async getMyEmployees(): Promise<User[]> {
     const response: AxiosResponse<User[]> = await this.api.get('/Agents/me/employees');
-    return response.data;
+    return (response.data ?? []).map((u) => this.normalizeUserPagePermissions(u));
   }
 
   /** إضافة موظف للوكيل الحالي (Agent) — Body يتضمن role: 4 (Employee) أو 5 (SubAgent) */
@@ -1183,6 +1220,22 @@ class ApiService {
   /** حذف موظف تابع للوكيل الحالي (Agent) */
   async deleteMyEmployee(id: string): Promise<void> {
     await this.api.delete(`/Agents/me/employees/${id}`);
+  }
+
+  async getEmployeePermissionCatalog(): Promise<EmployeePermissionCatalog> {
+    const response = await this.api.get<Record<string, unknown>>('/employee-permissions/catalog');
+    const raw = response.data ?? {};
+    const pagesRaw = (raw.pages ?? raw.Pages ?? []) as Array<Record<string, unknown>>;
+    return {
+      pages: pagesRaw.map((p) => ({
+        page: String(p.page ?? p.Page ?? ''),
+        label: String(p.label ?? p.Label ?? ''),
+        actions: ((p.actions ?? p.Actions ?? []) as Array<Record<string, unknown>>).map((a) => ({
+          action: String(a.action ?? a.Action ?? ''),
+          label: String(a.label ?? a.Label ?? ''),
+        })),
+      })),
+    };
   }
 
   // --- Employee Tasks ---

@@ -7,14 +7,14 @@ import { UserRole } from '../types';
 import {
   AgentEmployeeCreateRequest,
   AgentEmployeeUpdateRequest,
+  EmployeePagePermissionSet,
   User,
   AgentReseller,
-  DEFAULT_EMPLOYEE_PERMISSIONS,
-  EMPLOYEE_PERMISSION_LABELS,
-  EmployeePermissions,
 } from '../types';
+import EmployeePagePermissionsEditor from '../components/EmployeePagePermissionsEditor';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { UserPlus, X, Edit, Trash2, CheckCircle2 } from 'lucide-react';
+import { normalizePagePermissions } from '../utils/employeePermissions';
 
 const getEmployeeRoleLabel = (role: UserRole | number | undefined): string => {
   if (role == null) return '—';
@@ -23,6 +23,18 @@ const getEmployeeRoleLabel = (role: UserRole | number | undefined): string => {
   if (r === UserRole.SubAgent) return 'مدير ثانوي';
   return '—';
 };
+
+const isSubAgentRole = (role: UserRole | number | undefined): boolean =>
+  role === UserRole.SubAgent || Number(role) === UserRole.SubAgent;
+
+const emptyCreateForm = (): AgentEmployeeCreateRequest => ({
+  username: '',
+  fullName: '',
+  password: '',
+  role: UserRole.Employee,
+  pagePermissions: [],
+  allowedResellerIds: [],
+});
 
 const EmployeesPage: React.FC = () => {
   const { user } = useAuth();
@@ -33,18 +45,11 @@ const EmployeesPage: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
-  const [newEmployeeData, setNewEmployeeData] = useState<AgentEmployeeCreateRequest>({
-    username: '',
-    fullName: '',
-    password: '',
-    role: UserRole.Employee,
-    ...DEFAULT_EMPLOYEE_PERMISSIONS,
-    allowedResellerIds: [],
-  });
+  const [newEmployeeData, setNewEmployeeData] = useState<AgentEmployeeCreateRequest>(emptyCreateForm());
   const [editEmployeeData, setEditEmployeeData] = useState<AgentEmployeeUpdateRequest>({
     fullName: '',
     isActive: true,
-    ...DEFAULT_EMPLOYEE_PERMISSIONS,
+    pagePermissions: [],
     allowedResellerIds: [],
   });
 
@@ -65,7 +70,7 @@ const EmployeesPage: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-employees'] });
       setShowAddModal(false);
-      setNewEmployeeData({ username: '', fullName: '', password: '', role: UserRole.Employee, ...DEFAULT_EMPLOYEE_PERMISSIONS, allowedResellerIds: [] });
+      setNewEmployeeData(emptyCreateForm());
       showSuccess('تمت الإضافة', 'تم إضافة الموظف بنجاح');
     },
     onError: (err: unknown) => {
@@ -102,23 +107,38 @@ const EmployeesPage: React.FC = () => {
       showError('خطأ', 'يرجى تعبئة جميع الحقول');
       return;
     }
-    const dataToSend = newEmployeeData.role === UserRole.SubAgent
-      ? { ...newEmployeeData, ...DEFAULT_EMPLOYEE_PERMISSIONS }
-      : newEmployeeData;
+    if (newEmployeeData.role !== UserRole.SubAgent) {
+      const perms = normalizePagePermissions(newEmployeeData.pagePermissions);
+      if (perms.length === 0) {
+        showError('خطأ', 'يرجى اختيار صلاحية واحدة على الأقل');
+        return;
+      }
+    }
+    const dataToSend: AgentEmployeeCreateRequest =
+      newEmployeeData.role === UserRole.SubAgent
+        ? {
+            username: newEmployeeData.username,
+            fullName: newEmployeeData.fullName,
+            password: newEmployeeData.password,
+            role: UserRole.SubAgent,
+          }
+        : {
+            username: newEmployeeData.username,
+            fullName: newEmployeeData.fullName,
+            password: newEmployeeData.password,
+            role: UserRole.Employee,
+            pagePermissions: normalizePagePermissions(newEmployeeData.pagePermissions),
+            allowedResellerIds: newEmployeeData.allowedResellerIds,
+          };
     createEmployeeMutation.mutate(dataToSend);
   };
 
   const handleOpenEdit = (emp: User) => {
     setSelectedEmployee(emp);
-    const permissionKeys = Object.keys(EMPLOYEE_PERMISSION_LABELS) as (keyof EmployeePermissions)[];
-    const permissions: EmployeePermissions = { ...DEFAULT_EMPLOYEE_PERMISSIONS };
-    for (const key of permissionKeys) {
-      permissions[key] = emp[key] ?? DEFAULT_EMPLOYEE_PERMISSIONS[key];
-    }
     setEditEmployeeData({
       fullName: emp.fullName || '',
       isActive: emp.isActive ?? true,
-      ...permissions,
+      pagePermissions: normalizePagePermissions(emp.pagePermissions),
       allowedResellerIds: emp.allowedResellerIds ?? [],
     });
     setShowEditModal(true);
@@ -187,6 +207,12 @@ const EmployeesPage: React.FC = () => {
                         </span>
                         <span className="text-gray-500 dark:text-gray-400">·</span>
                         <span className="text-gray-600 dark:text-gray-300">{getEmployeeRoleLabel(emp.role)}</span>
+                        {!isSubAgentRole(emp.role) && emp.pagePermissions?.length ? (
+                          <>
+                            <span className="text-gray-500 dark:text-gray-400">·</span>
+                            <span className="text-gray-600 dark:text-gray-300">{emp.pagePermissions.length} صفحة</span>
+                          </>
+                        ) : null}
                       </p>
                     </div>
                     {canManageEmployees && (
@@ -222,16 +248,15 @@ const EmployeesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Add Employee Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">إضافة موظف جديد</h2>
               <button
                 onClick={() => {
                   setShowAddModal(false);
-                  setNewEmployeeData({ username: '', fullName: '', password: '', role: UserRole.Employee, ...DEFAULT_EMPLOYEE_PERMISSIONS, allowedResellerIds: [] });
+                  setNewEmployeeData(emptyCreateForm());
                 }}
                 className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
               >
@@ -274,37 +299,22 @@ const EmployeesPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                 >
                   <option value={UserRole.Employee}>موظف</option>
-                  {canCreateSubAgent && (
-                    <option value={UserRole.SubAgent}>مدير ثانوي</option>
-                  )}
+                  {canCreateSubAgent && <option value={UserRole.SubAgent}>مدير ثانوي</option>}
                 </select>
-                {!canCreateSubAgent && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">فقط الوكيل يمكنه إنشاء مدير ثانوي</p>
-                )}
               </div>
               <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الصلاحيات</p>
                 {newEmployeeData.role === UserRole.SubAgent ? (
                   <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-3">
                     <p className="text-sm font-medium text-primary-800 dark:text-primary-200 mb-1">منح جميع الصلاحيات</p>
-                    <p className="text-xs text-primary-700 dark:text-primary-300">
-                      المدير الثانوي يملك نفس صلاحيات الوكيل: تفعيل وتعديل وحذف مشترك، إضافة وتعديل وحذف دين، عرض تفاصيل دين، الفواتير وإيصالات التجديد، الحسابات والرصيد والتسليمات، وغيرها.
-                    </p>
+                    <p className="text-xs text-primary-700 dark:text-primary-300">المدير الثانوي يملك نفس صلاحيات الوكيل.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {(Object.keys(EMPLOYEE_PERMISSION_LABELS) as (keyof EmployeePermissions)[]).map((key) => (
-                      <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                        <input
-                          type="checkbox"
-                          checked={newEmployeeData[key] !== false}
-                          onChange={(e) => setNewEmployeeData((p) => ({ ...p, [key]: e.target.checked }))}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        {EMPLOYEE_PERMISSION_LABELS[key]}
-                      </label>
-                    ))}
-                  </div>
+                  <EmployeePagePermissionsEditor
+                    value={newEmployeeData.pagePermissions ?? []}
+                    onChange={(pagePermissions: EmployeePagePermissionSet[]) =>
+                      setNewEmployeeData((p) => ({ ...p, pagePermissions }))
+                    }
+                  />
                 )}
               </div>
               {newEmployeeData.role !== UserRole.SubAgent && myResellers.length > 0 && (
@@ -336,22 +346,8 @@ const EmployeesPage: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setNewEmployeeData({ username: '', fullName: '', password: '', role: UserRole.Employee, ...DEFAULT_EMPLOYEE_PERMISSIONS, allowedResellerIds: [] });
-                  }}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-md text-gray-800 dark:text-white"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAddEmployee}
-                  disabled={createEmployeeMutation.isPending}
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:opacity-50"
-                >
+                <button type="button" onClick={() => { setShowAddModal(false); setNewEmployeeData(emptyCreateForm()); }} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-md text-gray-800 dark:text-white">إلغاء</button>
+                <button type="button" onClick={handleAddEmployee} disabled={createEmployeeMutation.isPending} className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:opacity-50">
                   {createEmployeeMutation.isPending ? 'جاري الإضافة...' : 'إضافة'}
                 </button>
               </div>
@@ -360,62 +356,37 @@ const EmployeesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Employee Modal */}
       {showEditModal && selectedEmployee && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">تعديل الموظف</h2>
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setSelectedEmployee(null);
-                }}
-                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
+              <button onClick={() => { setShowEditModal(false); setSelectedEmployee(null); }} className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
             <div className="space-y-4">
               <div className="bg-gray-50 dark:bg-gray-700 rounded-md p-3">
-                <p className="text-sm text-gray-700 dark:text-gray-200">
-                  @{selectedEmployee.username}
-                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-200">@{selectedEmployee.username}</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الاسم الكامل *</label>
-                <input
-                  type="text"
-                  value={editEmployeeData.fullName}
-                  onChange={(e) => setEditEmployeeData((p) => ({ ...p, fullName: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                />
+                <input type="text" value={editEmployeeData.fullName} onChange={(e) => setEditEmployeeData((p) => ({ ...p, fullName: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" />
               </div>
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">نشط</label>
-                <input
-                  type="checkbox"
-                  checked={editEmployeeData.isActive !== false}
-                  onChange={(e) => setEditEmployeeData((p) => ({ ...p, isActive: e.target.checked }))}
-                  className="h-4 w-4"
-                />
+                <input type="checkbox" checked={editEmployeeData.isActive !== false} onChange={(e) => setEditEmployeeData((p) => ({ ...p, isActive: e.target.checked }))} className="h-4 w-4" />
               </div>
-              <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">الصلاحيات</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {(Object.keys(EMPLOYEE_PERMISSION_LABELS) as (keyof EmployeePermissions)[]).map((key) => (
-                    <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={editEmployeeData[key] !== false}
-                        onChange={(e) => setEditEmployeeData((p) => ({ ...p, [key]: e.target.checked }))}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      {EMPLOYEE_PERMISSION_LABELS[key]}
-                    </label>
-                  ))}
+              {!isSubAgentRole(selectedEmployee.role) && (
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                  <EmployeePagePermissionsEditor
+                    value={editEmployeeData.pagePermissions ?? []}
+                    onChange={(pagePermissions: EmployeePagePermissionSet[]) =>
+                      setEditEmployeeData((p) => ({ ...p, pagePermissions }))
+                    }
+                  />
                 </div>
-              </div>
+              )}
               {myResellers.length > 0 && (
                 <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">المناطق المسموح بها</p>
@@ -445,16 +416,7 @@ const EmployeesPage: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setSelectedEmployee(null);
-                  }}
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-md text-gray-800 dark:text-white"
-                >
-                  إلغاء
-                </button>
+                <button type="button" onClick={() => { setShowEditModal(false); setSelectedEmployee(null); }} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-md text-gray-800 dark:text-white">إلغاء</button>
                 <button
                   type="button"
                   onClick={() => {
@@ -462,19 +424,25 @@ const EmployeesPage: React.FC = () => {
                       showError('خطأ', 'يرجى إدخال الاسم الكامل');
                       return;
                     }
-                    updateEmployeeMutation.mutate({ id: selectedEmployee.id, data: { ...editEmployeeData, fullName: editEmployeeData.fullName.trim() } });
+                    const trimmedName = editEmployeeData.fullName.trim();
+                    const data: AgentEmployeeUpdateRequest = isSubAgentRole(selectedEmployee.role)
+                      ? { fullName: trimmedName, isActive: editEmployeeData.isActive, allowedResellerIds: editEmployeeData.allowedResellerIds }
+                      : {
+                          fullName: trimmedName,
+                          isActive: editEmployeeData.isActive,
+                          pagePermissions: normalizePagePermissions(editEmployeeData.pagePermissions),
+                          allowedResellerIds: editEmployeeData.allowedResellerIds,
+                        };
+                    if (!isSubAgentRole(selectedEmployee.role) && !data.pagePermissions?.length) {
+                      showError('خطأ', 'يرجى اختيار صلاحية واحدة على الأقل');
+                      return;
+                    }
+                    updateEmployeeMutation.mutate({ id: selectedEmployee.id, data });
                   }}
                   disabled={updateEmployeeMutation.isPending}
                   className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:opacity-50 flex items-center gap-2"
                 >
-                  {updateEmployeeMutation.isPending ? (
-                    'جاري الحفظ...'
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      حفظ
-                    </>
-                  )}
+                  {updateEmployeeMutation.isPending ? 'جاري الحفظ...' : (<><CheckCircle2 className="h-4 w-4" />حفظ</>)}
                 </button>
               </div>
             </div>

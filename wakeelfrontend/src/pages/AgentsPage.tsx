@@ -18,11 +18,11 @@ import {
   User,
   UserRole,
   AgentEmployeeCreateRequest,
-  DEFAULT_EMPLOYEE_PERMISSIONS,
-  EMPLOYEE_PERMISSION_LABELS,
-  EmployeePermissions,
+  EmployeePagePermissionSet,
   AgentRegistrationApproveRequest,
 } from '../types';
+import EmployeePagePermissionsEditor from '../components/EmployeePagePermissionsEditor';
+import { normalizePagePermissions } from '../utils/employeePermissions';
 import { IraqGovernorates } from '../types';
 import Pagination from '../components/Pagination';
 import { StatCard } from '../components/StatCard';
@@ -84,7 +84,7 @@ const AgentsPage: React.FC = () => {
     fullName: '',
     password: '',
     role: UserRole.Employee,
-    ...DEFAULT_EMPLOYEE_PERMISSIONS,
+    pagePermissions: [],
   });
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -149,7 +149,7 @@ const AgentsPage: React.FC = () => {
     onSuccess: (_, { agentId }) => {
       queryClient.invalidateQueries({ queryKey: ['agent-employees', agentId] });
       setShowAddEmployeeModal(false);
-      setNewEmployeeData({ username: '', fullName: '', password: '', ...DEFAULT_EMPLOYEE_PERMISSIONS });
+      setNewEmployeeData({ username: '', fullName: '', password: '', role: UserRole.Employee, pagePermissions: [] });
       showSuccess('تمت الإضافة', 'تم إضافة الموظف بنجاح');
     },
     onError: (err: unknown) => {
@@ -177,9 +177,28 @@ const AgentsPage: React.FC = () => {
       showError('خطأ', 'يرجى تعبئة جميع الحقول');
       return;
     }
-    const dataToSend = newEmployeeData.role === UserRole.SubAgent
-      ? { ...newEmployeeData, ...DEFAULT_EMPLOYEE_PERMISSIONS }
-      : newEmployeeData;
+    if (newEmployeeData.role !== UserRole.SubAgent) {
+      const perms = normalizePagePermissions(newEmployeeData.pagePermissions);
+      if (perms.length === 0) {
+        showError('خطأ', 'يرجى اختيار صلاحية واحدة على الأقل');
+        return;
+      }
+    }
+    const dataToSend: AgentEmployeeCreateRequest =
+      newEmployeeData.role === UserRole.SubAgent
+        ? {
+            username: newEmployeeData.username,
+            fullName: newEmployeeData.fullName,
+            password: newEmployeeData.password,
+            role: UserRole.SubAgent,
+          }
+        : {
+            username: newEmployeeData.username,
+            fullName: newEmployeeData.fullName,
+            password: newEmployeeData.password,
+            role: UserRole.Employee,
+            pagePermissions: normalizePagePermissions(newEmployeeData.pagePermissions),
+          };
     createEmployeeMutation.mutate({ agentId: selectedAgentForEmployees.id, data: dataToSend });
   };
 
@@ -2011,19 +2030,12 @@ const AgentsPage: React.FC = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-2">
-                        {(Object.keys(EMPLOYEE_PERMISSION_LABELS) as (keyof EmployeePermissions)[]).map((key) => (
-                          <label key={key} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                            <input
-                              type="checkbox"
-                              checked={newEmployeeData[key] !== false}
-                              onChange={(e) => setNewEmployeeData((p) => ({ ...p, [key]: e.target.checked }))}
-                              className="h-4 w-4 rounded border-gray-300"
-                            />
-                            {EMPLOYEE_PERMISSION_LABELS[key]}
-                          </label>
-                        ))}
-                      </div>
+                      <EmployeePagePermissionsEditor
+                        value={newEmployeeData.pagePermissions ?? []}
+                        onChange={(pagePermissions: EmployeePagePermissionSet[]) =>
+                          setNewEmployeeData((p) => ({ ...p, pagePermissions }))
+                        }
+                      />
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -2031,7 +2043,7 @@ const AgentsPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setShowAddEmployeeModal(false);
-                        setNewEmployeeData({ username: '', fullName: '', password: '', role: UserRole.Employee, ...DEFAULT_EMPLOYEE_PERMISSIONS });
+                        setNewEmployeeData({ username: '', fullName: '', password: '', role: UserRole.Employee, pagePermissions: [] });
                       }}
                       className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-md text-gray-800 dark:text-white"
                     >

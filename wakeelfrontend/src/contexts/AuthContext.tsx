@@ -1,7 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { MeFeaturesResponse, User, UserRole } from '../types';
 import { apiService } from '../services/api';
 import { buildUserFromLoginResponse } from '../utils/authLogin';
+import {
+  employeeCanAccessAdminPath,
+  hasPageAction,
+  usesPagePermissions,
+} from '../utils/employeePermissions';
 
 interface AuthContextType {
   user: User | null;
@@ -15,6 +20,9 @@ interface AuthContextType {
   hasAnyRole: (roles: UserRole[]) => boolean;
   hasFeature: (feature: string) => boolean;
   checkAgentSubscription: () => Promise<boolean>;
+  hasPageAction: (page: string, action: string) => boolean;
+  canAccessAdminPath: (path: string) => boolean;
+  usesPagePermissions: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,6 +107,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
 
+      if (response.pagePermissions?.length) {
+        userData = { ...userData, pagePermissions: response.pagePermissions };
+      }
+
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       setTenantId(featuresData.tenantId ?? null);
@@ -152,6 +164,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return true;
   };
 
+  const checkPageAction = useCallback(
+    (page: string, action: string) => hasPageAction(user, page, action),
+    [user]
+  );
+
+  const checkAdminPath = useCallback(
+    (path: string) => employeeCanAccessAdminPath(user, path),
+    [user]
+  );
+
   const value: AuthContextType = {
     user,
     tenantId,
@@ -164,6 +186,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     hasAnyRole,
     hasFeature,
     checkAgentSubscription,
+    hasPageAction: checkPageAction,
+    canAccessAdminPath: checkAdminPath,
+    usesPagePermissions: usesPagePermissions(user),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -238,6 +238,7 @@ export interface LoginResponse {
   skipAgentsMeAndSync?: boolean;
   pendingEmployeeTasksCount?: number;
   errorMessage?: string | null;
+  pagePermissions?: EmployeePagePermissionSet[];
 }
 
 /** GET /me/features */
@@ -851,6 +852,27 @@ export interface AgentResellerCredentialsDto {
 }
 
 // User Types
+/** صلاحيات موظف مجمّعة حسب الصفحة */
+export interface EmployeePagePermissionSet {
+  page: string;
+  actions: string[];
+}
+
+export interface EmployeePermissionActionCatalogItem {
+  action: string;
+  label: string;
+}
+
+export interface EmployeePermissionPageCatalogItem {
+  page: string;
+  label: string;
+  actions: EmployeePermissionActionCatalogItem[];
+}
+
+export interface EmployeePermissionCatalog {
+  pages: EmployeePermissionPageCatalogItem[];
+}
+
 /** صلاحيات الموظف (Employee) — تُطبّق في الباكند عند دور Employee فقط */
 export interface EmployeePermissions {
   canActivateSubscriber: boolean;
@@ -920,7 +942,12 @@ export interface User {
   canAccessSubscriberDashboard?: boolean;
   canViewAllSubscribers?: boolean;
   canReceiveTaskRequests?: boolean;
+  canAddMaterial?: boolean;
+  canDisburseMaterial?: boolean;
+  canManageMaterialsAndSales?: boolean;
+  canManageEmployeeTasks?: boolean;
   allowedResellerIds?: string[];
+  pagePermissions?: EmployeePagePermissionSet[];
   /** اشتراك الوكيل الرئيسي (عندما role = MainAgent) */
   subscriptionType?: SubscriptionSystemType;
   subscriptionStartDate?: string;
@@ -1959,6 +1986,7 @@ export interface AgentEmployeeCreateRequest {
   canViewAllSubscribers?: boolean;
   canReceiveTaskRequests?: boolean;
   allowedResellerIds?: string[];
+  pagePermissions?: EmployeePagePermissionSet[];
 }
 
 /** طلب تعديل موظف لوكيل */
@@ -1976,6 +2004,7 @@ export interface AgentEmployeeUpdateRequest {
   canViewAllSubscribers?: boolean;
   canReceiveTaskRequests?: boolean;
   allowedResellerIds?: string[];
+  pagePermissions?: EmployeePagePermissionSet[];
 }
 
 /** عنصر رصيد منطقة من GET /Renewals/balance */

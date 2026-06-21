@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
+import { employeeCanReceiveTaskRequests } from '../utils/employeePermissions';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
 import {
@@ -247,7 +248,7 @@ const EmployeeTasksPage: React.FC = () => {
   // SignalR: إشعارات المهام الجديدة للموظف فقط
   useEffect(() => {
     if (!isEmployee) return;
-    if (!user?.canReceiveTaskRequests) return;
+    if (!employeeCanReceiveTaskRequests(user)) return;
 
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -434,13 +435,13 @@ const EmployeeTasksPage: React.FC = () => {
       })();
       signalRConnectionRef.current = null;
     };
-  }, [isEmployee, user?.canReceiveTaskRequests, user?.id, queryClient]);
+  }, [isEmployee, user, queryClient]);
 
   useEffect(() => {
     if (!isEmployee) return;
-    if (!user?.canReceiveTaskRequests) return;
+    if (!employeeCanReceiveTaskRequests(user)) return;
     setPushReady(typeof Notification !== 'undefined' && Notification.permission === 'granted');
-  }, [isEmployee, user?.canReceiveTaskRequests]);
+  }, [isEmployee, user]);
 
   const createMutation = useMutation({
     mutationFn: (payload: EmployeeTaskCreateRequest) => apiService.createEmployeeTask(payload),
@@ -665,7 +666,7 @@ const EmployeeTasksPage: React.FC = () => {
             {isEmployee ? 'مهامي الشخصية' : 'إدارة مهام الموظفين'}
           </p>
         </div>
-        {isEmployee && user?.canReceiveTaskRequests && (
+        {isEmployee && employeeCanReceiveTaskRequests(user) && (
           <button
             type="button"
             onClick={async () => {

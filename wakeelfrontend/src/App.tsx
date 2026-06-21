@@ -15,6 +15,11 @@ import NotificationContainer from './components/NotificationContainer';
 import OfflineIndicator from './components/OfflineIndicator';
 import { useAuth } from './contexts/AuthContext';
 import { TenantPlanType, UserRole } from './types';
+import {
+  employeeCanAccessDashboard,
+  employeeCanAccessEmployeeTasks,
+  usesPagePermissions,
+} from './utils/employeePermissions';
 
 // Lazy load pages — تُحمّل فقط عند زيارة الصفحة (Code Splitting)
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -61,43 +66,48 @@ const queryClient = new QueryClient({
   },
 });
 
-/** توجيه /admin إلى أول صفحة مسموح بها (للموظف بدون صلاحية لوحة التحكم → صفحة المشتركين) */
 function AdminIndexRedirect() {
-  const { user } = useAuth();
-  if (user?.role === UserRole.Employee && !user?.canAccessSubscriberDashboard) {
-    return <Navigate to="/admin/subscribers" replace />;
+  const { user, canAccessAdminPath } = useAuth();
+  if (user?.role === UserRole.Employee) {
+    if (usesPagePermissions(user)) {
+      if (canAccessAdminPath('/admin/dashboard')) return <Navigate to="/admin/dashboard" replace />;
+      if (canAccessAdminPath('/admin/subscribers')) return <Navigate to="/admin/subscribers" replace />;
+      if (canAccessAdminPath('/admin/maintenance-requests')) return <Navigate to="/admin/maintenance-requests" replace />;
+      if (canAccessAdminPath('/admin/employees/tasks')) return <Navigate to="/admin/employees/tasks" replace />;
+      return <Navigate to="/admin/subscribers" replace />;
+    }
+    if (!employeeCanAccessDashboard(user)) {
+      return <Navigate to="/admin/subscribers" replace />;
+    }
   }
   return <Navigate to="/admin/dashboard" replace />;
 }
 
-/** للموظف: إخفاء لوحة التحكم عند عدم الصلاحية — إعادة توجيه لصفحة المشتركين بدون رسالة */
 function DashboardRoute() {
-  const { user } = useAuth();
-  if (user?.role === UserRole.Employee && !user?.canAccessSubscriberDashboard) {
-    return <Navigate to="/admin/subscribers" replace />;
+  const { user, canAccessAdminPath } = useAuth();
+  if (user?.role === UserRole.Employee) {
+    if (usesPagePermissions(user) && !canAccessAdminPath('/admin/dashboard')) {
+      return <Navigate to="/admin/subscribers" replace />;
+    }
+    if (!usesPagePermissions(user) && !employeeCanAccessDashboard(user)) {
+      return <Navigate to="/admin/subscribers" replace />;
+    }
   }
   return <DashboardPage />;
 }
 
-/** للموظف بدون canAccessExpensesAndSalarySheet و canAccessSubscriberDashboard: إخفاء الباقات، موظفون، سجل الحركات، الحسابات، المصاريف، الإعدادات — إعادة توجيه بدون رسالة */
-function RestrictedEmployeeRoute({ routePath, children }: { routePath: string; children: React.ReactNode }) {
-  const { user } = useAuth();
-  const isRestricted =
-    user?.role === UserRole.Employee &&
-    user?.canAccessExpensesAndSalarySheet === false &&
-    user?.canAccessSubscriberDashboard === false;
-  const hiddenPaths = ['packages', 'employees', 'activity-log', 'reports', 'settings'];
-  const isHidden = hiddenPaths.includes(routePath) || routePath.startsWith('expenses');
-  if (isRestricted && isHidden) {
+function EmployeePageGuard({ path, children }: { path: string; children: React.ReactNode }) {
+  const { user, canAccessAdminPath } = useAuth();
+  if (user?.role === UserRole.Employee && !canAccessAdminPath(path)) {
     return <Navigate to="/admin/subscribers" replace />;
   }
   return <>{children}</>;
 }
 
-/** صفحة مهام الموظفين: للموظف فقط عند تفعيل CanReceiveTaskRequests */
+
 function EmployeeTasksAccessRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  if (user?.role === UserRole.Employee && !user?.canReceiveTaskRequests) {
+  if (user?.role === UserRole.Employee && !employeeCanAccessEmployeeTasks(user)) {
     return <Navigate to="/admin/subscribers" replace />;
   }
   return <>{children}</>;
@@ -187,7 +197,9 @@ function App() {
                   } />
                   <Route path="maintenance-requests" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <SubscriberMaintenanceRequestsPage />
+                      <EmployeePageGuard path="/admin/maintenance-requests">
+                        <SubscriberMaintenanceRequestsPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   
@@ -196,26 +208,32 @@ function App() {
                   <Route path="packages" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
                       <FeatureGuard hiddenWhenFeature="hide_subscription_pages" fallback={<Navigate to="/admin/subscribers" replace />}>
-                        <RestrictedEmployeeRoute routePath="packages">
+                        <EmployeePageGuard path="/admin/packages">
                           <PackagesPage />
-                        </RestrictedEmployeeRoute>
+                        </EmployeePageGuard>
                       </FeatureGuard>
                     </ProtectedRoute>
                   } />
                   {/* Materials - Admin, Agent, SubAgent */}
                   <Route path="materials" element={
-                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent]}>
-                      <MaterialsPage />
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/materials">
+                        <MaterialsPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="materials/disbursed" element={
-                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent]}>
-                      <MaterialsDisbursementPage />
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/materials/disbursed">
+                        <MaterialsDisbursementPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="materials/sales-history" element={
-                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent]}>
-                      <MaterialsDisbursementPage />
+                    <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
+                      <EmployeePageGuard path="/admin/materials/sales-history">
+                        <MaterialsDisbursementPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="agents" element={
@@ -227,9 +245,9 @@ function App() {
                   {/* Employees - مخفى عن الموظف المقيد */}
                   <Route path="employees" element={
                     <ProtectedRoute allowedRoles={[UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <RestrictedEmployeeRoute routePath="employees">
+                      <EmployeePageGuard path="/admin/employees">
                         <EmployeesPage />
-                      </RestrictedEmployeeRoute>
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="employees/tasks" element={
@@ -266,54 +284,64 @@ function App() {
                   {/* الحسابات */}
                   <Route path="reports" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <ReportsPage />
+                      <EmployeePageGuard path="/admin/reports">
+                        <ReportsPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   
                   {/* Receipts - Admin, Agent, SubAgent, Employee */}
                   <Route path="receipts" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <ReceiptsPage />
+                      <EmployeePageGuard path="/admin/receipts">
+                        <ReceiptsPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="balance" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <BalancePage />
+                      <EmployeePageGuard path="/admin/balance">
+                        <BalancePage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="customer-invoices" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent]}>
-                      <CustomerInvoicesPage />
+                      <EmployeePageGuard path="/admin/customer-invoices">
+                        <CustomerInvoicesPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
 
                   {/* Debts - Admin, Agent, SubAgent, Employee */}
                   <Route path="debts" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <DebtsPage />
+                      <EmployeePageGuard path="/admin/debts">
+                        <DebtsPage />
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   {/* المصاريف - مخفى عن الموظف المقيد */}
                   <Route path="expenses/office" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <RestrictedEmployeeRoute routePath="expenses/office">
+                      <EmployeePageGuard path="/admin/expenses/office">
                         <OfficeExpensesPage />
-                      </RestrictedEmployeeRoute>
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   <Route path="expenses/salary-sheet" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.Employee]}>
-                      <RestrictedEmployeeRoute routePath="expenses/salary-sheet">
+                      <EmployeePageGuard path="/admin/expenses/salary-sheet">
                         <SalarySheetPage />
-                      </RestrictedEmployeeRoute>
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   {/* الإعدادات (المظهر، الملف الشخصي، إلخ) - متاحة للوكيل الرئيسي أيضًا */}
                   <Route path="settings" element={
                     <ProtectedRoute allowedRoles={[UserRole.Admin, UserRole.Agent, UserRole.SubAgent, UserRole.MainAgent, UserRole.Employee]}>
-                      <RestrictedEmployeeRoute routePath="settings">
+                      <EmployeePageGuard path="/admin/settings">
                         <SettingsPage />
-                      </RestrictedEmployeeRoute>
+                      </EmployeePageGuard>
                     </ProtectedRoute>
                   } />
                   

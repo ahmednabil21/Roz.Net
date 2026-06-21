@@ -89,5 +89,6 @@ export function buildUserFromLoginResponse(response: LoginResponse, loginUsernam
     standardPlanTierId: response.standardPlanTierId ?? undefined,
     standardPlanTier: response.standardPlanTier ?? undefined,
     maxResellers: response.maxResellers ?? undefined,
+    pagePermissions: response.pagePermissions,
   };
 }

@@ -17,6 +17,7 @@ import { DEFAULT_DETAILS_TEMPLATE, DEFAULT_ACTIVATION_TEMPLATE } from '../utils/
 import { formatReceiptPrintDate, resolveReceiptPrintAmounts } from '../utils/receiptPrint';
 import { useConfirmation } from '../contexts/ConfirmationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { hasPageAction } from '../utils/employeePermissions';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
 import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
@@ -695,7 +696,8 @@ const SubscribersPage: React.FC = () => {
       const noteTypeNum =
         appliedNoteTypeFilter === 'all' ? undefined : (parseInt(appliedNoteTypeFilter, 10) as SubscriberNoteType);
       const rawSearch = debouncedSearchTerm && debouncedSearchTerm.trim() ? debouncedSearchTerm.trim() : '';
-      const employeeRequiresTwoWords = user?.role === UserRole.Employee && !user?.canViewAllSubscribers;
+      const employeeRequiresTwoWords =
+        user?.role === UserRole.Employee && !hasPageAction(user, 'Subscribers', 'details');
       const searchWords = rawSearch ? rawSearch.split(/\s+/).filter(Boolean) : [];
       const effectiveSearch =
         !rawSearch
@@ -904,13 +906,20 @@ const SubscribersPage: React.FC = () => {
     user?.role === UserRole.Employee;
   /** للموظف: كل إجراء يظهر فقط عند منح صلاحيته بشكل مستقل */
   const isEmployee = user?.role === UserRole.Employee;
-  const showEditSubscriberAction = !isEmployee || !!user?.canEditSubscriber;
-  const showDeleteSubscriberAction = !isEmployee || !!user?.canDeleteSubscriber;
-  const showViewDetailsAction = !isEmployee || !!user?.canEditSubscriber || !!user?.canDeleteSubscriber;
+  const showEditSubscriberAction = !isEmployee || hasPageAction(user, 'Subscribers', 'edit');
+  const showDeleteSubscriberAction = !isEmployee || hasPageAction(user, 'Subscribers', 'delete');
+  const showViewDetailsAction =
+    !isEmployee ||
+    hasPageAction(user, 'Subscribers', 'edit') ||
+    hasPageAction(user, 'Subscribers', 'delete') ||
+    hasPageAction(user, 'Subscribers', 'details');
   const showActivateViaTabAction =
-    !isEmployee || !!user?.canActivateSubscriber || !!user?.canEditSubscriber || !!user?.canDeleteSubscriber;
+    !isEmployee ||
+    hasPageAction(user, 'Subscribers', 'activate') ||
+    hasPageAction(user, 'Subscribers', 'edit') ||
+    hasPageAction(user, 'Subscribers', 'delete');
   /** للموظف بدون صلاحية عرض الكل: إلزام إدخال الاسم الأول والثاني (كلمتين على الأقل) للبحث */
-  const requireTwoWordsForSearch = isEmployee && !user?.canViewAllSubscribers;
+  const requireTwoWordsForSearch = isEmployee && !hasPageAction(user, 'Subscribers', 'details');
   const { data: myAgent, isLoading: myAgentLoading, error: myAgentError } = useQuery({
     queryKey: ['myAgent'],
     queryFn: () => apiService.getMyAgent(),
