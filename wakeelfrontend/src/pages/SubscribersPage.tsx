@@ -407,8 +407,7 @@ function mapFtthAppTransactionToCompareItem(item: FtthAppTransactionsItem): Ftth
     transactionAmount: item.transactionAmount,
     operationType: item.operationType,
     isNewSubscriber: resolveFtthCompareIsNewSubscriber(item),
-    basePlanRenewalCount: item.activationCount,
-    sameDayBasePlanRenewalCount: 0,
+    activationCount: item.activationCount,
   };
 }
 
