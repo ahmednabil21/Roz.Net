@@ -1255,6 +1255,7 @@ function SettingsPage() {
   const [showServiceFeeForm, setShowServiceFeeForm] = useState(false);
   const [serviceFeeName, setServiceFeeName] = useState('');
   const [serviceFeePrice, setServiceFeePrice] = useState('');
+  const [serviceFeeResellerIds, setServiceFeeResellerIds] = useState<string[]>([]);
 
   const { data: serviceFeesAgentsData } = useQuery({
     queryKey: ['agents-list-service-fees'],
@@ -1269,6 +1270,18 @@ function SettingsPage() {
     enabled: canViewServiceFees && activeSection === 'serviceFees' && (!isAdmin || !!serviceFeesAgentId),
   });
 
+  const { data: serviceFeesResellers = [] } = useQuery<AgentReseller[]>({
+    queryKey: ['serviceFeesResellers', isAdmin ? serviceFeesAgentId : 'me'],
+    queryFn: () =>
+      isAdmin
+        ? apiService.getAgentResellers(serviceFeesAgentId)
+        : apiService.getMyResellers(),
+    enabled:
+      canViewServiceFees &&
+      activeSection === 'serviceFees' &&
+      (!isAdmin || !!serviceFeesAgentId),
+  });
+
   const createServiceFeeMutation = useMutation({
     mutationFn: (data: ServiceFeesCreateRequest) => apiService.createServiceFee(data),
     onSuccess: () => {
@@ -1278,6 +1291,7 @@ function SettingsPage() {
       setShowServiceFeeForm(false);
       setServiceFeeName('');
       setServiceFeePrice('');
+      setServiceFeeResellerIds([]);
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
@@ -1292,6 +1306,7 @@ function SettingsPage() {
       setShowServiceFeeForm(false);
       setServiceFeeName('');
       setServiceFeePrice('');
+      setServiceFeeResellerIds([]);
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
@@ -1311,6 +1326,29 @@ function SettingsPage() {
     setShowServiceFeeForm(true);
     setServiceFeeName(fee.name);
     setServiceFeePrice(String(fee.price));
+    setServiceFeeResellerIds(fee.resellerIds ?? []);
+  };
+
+  const toggleServiceFeeReseller = (resellerId: string) => {
+    setServiceFeeResellerIds((prev) =>
+      prev.includes(resellerId) ? prev.filter((id) => id !== resellerId) : [...prev, resellerId],
+    );
+  };
+
+  const serviceFeeResellerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of serviceFeesResellers) {
+      map.set(r.id, r.regionName ? `${r.name} (${r.regionName})` : r.name);
+    }
+    return map;
+  }, [serviceFeesResellers]);
+
+  const formatServiceFeeResellers = (fee: ServiceFees) => {
+    const ids = fee.resellerIds ?? [];
+    if (ids.length === 0) return '— لا يُطبَّق على أي رسيلر —';
+    return ids
+      .map((id) => serviceFeeResellerNameById.get(id) ?? id.slice(0, 8))
+      .join('، ');
   };
 
   const handleSaveServiceFee = () => {
@@ -1326,7 +1364,7 @@ function SettingsPage() {
     if (serviceFeeFormId) {
       updateServiceFeeMutation.mutate({
         id: serviceFeeFormId,
-        data: { name: serviceFeeName.trim(), price },
+        data: { name: serviceFeeName.trim(), price, resellerIds: serviceFeeResellerIds },
       });
     } else {
       if (isAdmin && !serviceFeesAgentId.trim()) {
@@ -1337,6 +1375,7 @@ function SettingsPage() {
         name: serviceFeeName.trim(),
         price,
         agentId: isAdmin ? serviceFeesAgentId.trim() : undefined,
+        resellerIds: serviceFeeResellerIds,
       });
     }
   };
@@ -3326,6 +3365,7 @@ function SettingsPage() {
                       setShowServiceFeeForm(true);
                       setServiceFeeName('');
                       setServiceFeePrice('');
+                      setServiceFeeResellerIds([]);
                     }}
                     className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm"
                   >
@@ -3335,7 +3375,7 @@ function SettingsPage() {
                 )}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                إدارة أسماء الخدمات وأسعارها المرتبطة بالوكيل. لا يُسمح بتكرار اسم الخدمة لنفس الوكيل.
+                إدارة أسماء الخدمات وأسعارها المرتبطة بالوكيل. حدّد الرسيلرز التي تنطبق عليها كل خدمة؛ إن لم تُحدَّد أي رسيلرز فلن تظهر في التفعيل ولن تُحسب في الحسابات.
               </p>
 
               {isAdmin && (
@@ -3372,6 +3412,7 @@ function SettingsPage() {
                         <tr>
                           <th>اسم الخدمة</th>
                           <th>السعر</th>
+                          <th>الرسيلرز</th>
                           {canManageServiceFees && <th className="w-28">إجراءات</th>}
                         </tr>
                       </thead>
@@ -3380,6 +3421,9 @@ function SettingsPage() {
                           <tr key={fee.id}>
                             <td className="font-medium text-gray-900 dark:text-white">{fee.name}</td>
                             <td className="tabular-nums">{formatNumber(fee.price, { suffix: ' د.ع' })}</td>
+                            <td className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+                              {formatServiceFeeResellers(fee)}
+                            </td>
                             {canManageServiceFees && (
                               <td>
                                 <div className="flex items-center gap-2">
@@ -3441,6 +3485,46 @@ function SettingsPage() {
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
                           />
                         </div>
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                          الرسيلرز المطبَّقة *
+                        </label>
+                        {serviceFeesResellers.length === 0 ? (
+                          <p className="text-xs text-amber-700 dark:text-amber-300">
+                            لا توجد رسيلرز. أضف رسيلرز من قسم المناطق والرسيلرز أولاً.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-200 dark:border-gray-600 rounded-md">
+                            {serviceFeesResellers.map((reseller) => {
+                              const checked = serviceFeeResellerIds.includes(reseller.id);
+                              return (
+                                <label
+                                  key={reseller.id}
+                                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm cursor-pointer border ${
+                                    checked
+                                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-200'
+                                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleServiceFeeReseller(reseller.id)}
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <span>
+                                    {reseller.name}
+                                    {reseller.regionName ? ` (${reseller.regionName})` : ''}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          بدون تحديد رسيلر لن تظهر الأجور في التفعيل ولا في إحصائيات الحسابات.
+                        </p>
                       </div>
                       <div className="flex gap-2 mt-3">
                         <button

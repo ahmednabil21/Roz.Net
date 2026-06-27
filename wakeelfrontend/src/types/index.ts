@@ -1107,17 +1107,20 @@ export interface ServiceFees {
   agentId: string;
   name: string;
   price: number;
+  resellerIds?: string[];
 }
 
 export interface ServiceFeesCreateRequest {
   name: string;
   price: number;
   agentId?: string;
+  resellerIds?: string[];
 }
 
 export interface ServiceFeesUpdateRequest {
   name: string;
   price: number;
+  resellerIds?: string[];
 }
 
 /** رسيلر وكيل (SAS / FTTH / Earthlink) — من GET/POST/PUT /Agents/me/resellers */

@@ -794,9 +794,9 @@ const SubscribersPage: React.FC = () => {
   });
 
   const { data: activationServiceFeesList = [] } = useQuery<ServiceFees[]>({
-    queryKey: ['serviceFees', 'activation'],
-    queryFn: () => apiService.getServiceFees(),
-    enabled: showRenewalModal,
+    queryKey: ['serviceFees', 'activation', renewalResellerIdForProfiles ?? '__no_reseller__'],
+    queryFn: () => apiService.getServiceFees(undefined, renewalResellerIdForProfiles!),
+    enabled: showRenewalModal && !!renewalResellerIdForProfiles,
   });
 
   const enabledActivationServiceFees = React.useMemo(

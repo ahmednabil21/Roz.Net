@@ -784,11 +784,14 @@ class ApiService {
   }
 
   /** قائمة أجور الخدمة — GET /ServiceFees */
-  async getServiceFees(agentId?: string): Promise<ServiceFees[]> {
+  async getServiceFees(agentId?: string, resellerId?: string): Promise<ServiceFees[]> {
+    const params: Record<string, string> = {};
+    if (agentId) params.agentId = agentId;
+    if (resellerId) params.resellerId = resellerId;
     const response = await this.api.get<ServiceFees[]>('/ServiceFees', {
-      params: agentId ? { agentId } : undefined,
+      params: Object.keys(params).length > 0 ? params : undefined,
     });
-    return response.data ?? [];
+    return this.normalizeServiceFeesList(response.data);
   }
 
   async getServiceFee(id: string): Promise<ServiceFees> {
@@ -1621,12 +1624,19 @@ class ApiService {
   private normalizeServiceFeesList(raw: unknown): ServiceFees[] {
     if (!Array.isArray(raw)) return [];
     return raw
-      .map((f: any) => ({
-        id: String(f?.id ?? f?.Id ?? ''),
-        agentId: String(f?.agentId ?? f?.AgentId ?? ''),
-        name: String(f?.name ?? f?.Name ?? ''),
-        price: Number(f?.price ?? f?.Price ?? 0) || 0,
-      }))
+      .map((f: any) => {
+        const resellerIdsRaw = f?.resellerIds ?? f?.ResellerIds;
+        const resellerIds = Array.isArray(resellerIdsRaw)
+          ? resellerIdsRaw.map((id: unknown) => String(id)).filter(Boolean)
+          : [];
+        return {
+          id: String(f?.id ?? f?.Id ?? ''),
+          agentId: String(f?.agentId ?? f?.AgentId ?? ''),
+          name: String(f?.name ?? f?.Name ?? ''),
+          price: Number(f?.price ?? f?.Price ?? 0) || 0,
+          resellerIds,
+        };
+      })
       .filter((f) => f.id);
   }
 
