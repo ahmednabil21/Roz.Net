@@ -36,8 +36,8 @@ import {
   Power
 } from 'lucide-react';
 
-/** استخراج جزء التاريخ YYYY-MM-DD من dueDate دون تحويل التوقيت (لتجنب تغيّر اليوم حسب timezone) */
-function getDueDatePart(isoOrDate?: string | null): string | null {
+/** استخراج جزء التاريخ YYYY-MM-DD من ISO دون تحويل التوقيت (لتجنب تغيّر اليوم حسب timezone) */
+function getDatePart(isoOrDate?: string | null): string | null {
   if (!isoOrDate || typeof isoOrDate !== 'string') return null;
   const part = isoOrDate.split('T')[0];
   return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : null;
@@ -77,8 +77,13 @@ const DebtsPage: React.FC = () => {
   const isAgentOrSubAgentOrEmployee =
     user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
 
+  const formatDebtDateForDisplay = (debt: { debtDate?: string | null }) => {
+    const part = getDatePart(debt?.debtDate);
+    return part ? formatDate(new Date(part + 'T12:00:00')) : '—';
+  };
+
   const formatDueDateForDisplay = (debt: { dueDate?: string | null }) => {
-    const part = getDueDatePart(debt?.dueDate);
+    const part = getDatePart(debt?.dueDate);
     return part ? formatDate(new Date(part + 'T12:00:00')) : '—';
   };
 
@@ -340,9 +345,10 @@ const DebtsPage: React.FC = () => {
     staleTime: 10_000,
   });
 
-  // الباكند يرسل dueDate فقط (تاريخ التسديد). العرض والترتيب يعتمدان عليه.
+  // الباكند يرسل debtDate (تاريخ الدين) و dueDate (تاريخ التسديد).
   const transformedDebts = debts.map((debt: Debt) => ({
     ...debt,
+    debtDate: debt.debtDate ?? '',
     dueDate: debt.dueDate ?? '',
     isPaid: debt.isPaid ?? false,
     agentName: debt.agentName || debt.agentCompanyName || 'غير محدد',
@@ -1097,7 +1103,7 @@ const DebtsPage: React.FC = () => {
                   ملاحظات الدين
                 </th>
                 <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  تاريخ التسديد
+                  تاريخ الدين
                 </th>
                 <th className="px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
                   تاريخ استلام الدين
@@ -1170,20 +1176,14 @@ const DebtsPage: React.FC = () => {
                   </td>
                   <td className="px-2 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white">
                     {(() => {
-                      const unpaidDebts = (subscriberDebt.debts || []).filter((d: any) => d.status === 0);
-                      const datesToShow = unpaidDebts.length > 0 ? unpaidDebts : subscriberDebt.debts || [];
-                      const earliestDue = datesToShow.reduce((min: string | null, d: any) => {
-                        const dDate = getDueDatePart(d.dueDate);
+                      const debtsList = subscriberDebt.debts || [];
+                      const earliestDebtDate = debtsList.reduce((min: string | null, d: Debt) => {
+                        const dDate = getDatePart(d.debtDate);
                         if (!dDate) return min;
                         return !min || dDate < min ? dDate : min;
                       }, null as string | null);
-                      const today = new Date().toISOString().split('T')[0];
-                      const isOverdue = earliestDue && earliestDue < today;
-                      return earliestDue ? (
-                        <span className={isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
-                          {formatDate(earliestDue + 'T12:00:00')}
-                          {isOverdue && <span className="text-xs mr-1">(متأخر)</span>}
-                        </span>
+                      return earliestDebtDate ? (
+                        formatDate(new Date(earliestDebtDate + 'T12:00:00'))
                       ) : (
                         <span className="text-gray-400">—</span>
                       );
@@ -1969,6 +1969,15 @@ const DebtsPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  تاريخ الدين
+                </label>
+                <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                  {formatDebtDateForDisplay(selectedDebt)}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   تاريخ التسديد
                 </label>
                 <p className="text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-700 p-2 rounded">
@@ -2149,7 +2158,7 @@ const DebtsPage: React.FC = () => {
                         قيمة التسديد
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        تاريخ التسديد
+                        تاريخ الدين
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         تاريخ استلام الدين
@@ -2199,7 +2208,7 @@ const DebtsPage: React.FC = () => {
                             : '—'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          {formatDueDateForDisplay(debt)}
+                          {formatDebtDateForDisplay(debt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {debt.paymentCreatedAt

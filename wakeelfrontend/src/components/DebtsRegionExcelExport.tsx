@@ -37,7 +37,7 @@ type Props = {
   formatNumber: (value: number, options?: { suffix?: string }) => string;
 };
 
-function getDueDatePart(isoOrDate?: string | null): string | null {
+function getDatePart(isoOrDate?: string | null): string | null {
   if (!isoOrDate || typeof isoOrDate !== 'string') return null;
   const part = isoOrDate.split('T')[0];
   return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : null;
@@ -127,23 +127,21 @@ const DebtsRegionExcelExport: React.FC<Props> = ({
         return;
       }
 
-      const headers = ['المشترك', 'إجمالي الدين', 'تاريخ التسديد', 'الدين غير المدفوع', 'عدد الديون', 'ملاحظات الدين', 'إطفاء/تشغيل'];
+      const headers = ['المشترك', 'إجمالي الدين', 'تاريخ الدين', 'الدين غير المدفوع', 'عدد الديون', 'ملاحظات الدين', 'إطفاء/تشغيل'];
       const dataRows = subscriberDebts.map((sd: any) => {
-        const unpaidDebts = (sd.debts || []).filter((d: Debt) => d.status === 0);
-        const datesToShow = unpaidDebts.length > 0 ? unpaidDebts : sd.debts || [];
-        const earliestDue = datesToShow.reduce((min: string | null, d: Debt) => {
-          const dDate = getDueDatePart(d.dueDate);
+        const earliestDebtDate = (sd.debts || []).reduce((min: string | null, d: Debt) => {
+          const dDate = getDatePart(d.debtDate);
           if (!dDate) return min;
           return !min || dDate < min ? dDate : min;
         }, null as string | null);
-        const dueDateStr = earliestDue ? formatDate(new Date(earliestDue + 'T12:00:00')) : '';
+        const debtDateStr = earliestDebtDate ? formatDate(new Date(earliestDebtDate + 'T12:00:00')) : '';
         const descStr = (sd.debts || []).map((d: Debt) => d.description || '').filter(Boolean).join('، ') || '';
         const offOn = sd.debts?.[0]?.offOn;
         const offOnStr = offOn === 0 ? 'إطفاء' : 'تشغيل';
         return [
           sd.subscriberName ?? '',
           sd.totalDebt ?? 0,
-          dueDateStr,
+          debtDateStr,
           sd.unpaidDebt ?? 0,
           sd.debts?.length ?? 0,
           descStr,
