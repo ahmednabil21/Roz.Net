@@ -2572,11 +2572,14 @@ export interface AccountsLedgerEntryBase {
   amount: number;
   /** وارد عام = مبلغ الباقة + الأجور (أو مبلغ تسديد الدين) */
   generalIncome?: number;
+  /** مبلغ الأجور — يظهر أيضاً في سجل تسديد أجور الخدمة */
+  serviceFeesAmount?: number;
   subscriberId?: string;
   subscriberName?: string;
   username?: string;
   executedByUserId?: string;
   executedByFullName?: string;
+  receiptNumber?: string;
 }
 
 export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
@@ -2603,6 +2606,7 @@ export interface AccountsLedgerRenewalEntry extends AccountsLedgerEntryBase {
   notes?: string | null;
   /** تفعيل آجل تم تسديد دينه */
   deferredDebtSettled?: boolean;
+  deferredSettledDetails?: AccountsLedgerDeferredSettledDetails;
   subscriberNoteType?: SubscriberNoteType | number | null;
   note?: string | null;
 }
@@ -2613,6 +2617,11 @@ export interface AccountsLedgerDebtPaymentEntry extends AccountsLedgerEntryBase 
 }
 
 export type AccountsLedgerEntry = AccountsLedgerRenewalEntry | AccountsLedgerDebtPaymentEntry;
+
+export interface AccountsLedgerDeferredSettledDetails {
+  activationDeferred: AccountsLedgerRenewalEntry;
+  payments: AccountsLedgerEntry[];
+}
 
 export interface AccountsLedgerPage {
   data: AccountsLedgerEntry[];

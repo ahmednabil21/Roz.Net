@@ -16,6 +16,7 @@ import {
   Agent,
   AccountsLedgerEntry,
   AccountsResponse,
+  AccountsLedgerDeferredSettledDetails,
   ActivationPaymentMethod,
   ProfilePackageType,
   AccountsLedgerKind,
@@ -31,6 +32,7 @@ import {
   Coins,
   CreditCard,
   DollarSign,
+  Eye,
   FileSpreadsheet,
   RefreshCw,
   Search,
@@ -119,6 +121,8 @@ function isRenewalEntry(row: AccountsLedgerEntry): row is AccountsLedgerEntry & 
   agentResellerId?: string;
   /** تفعيل آجل تم تسديد دينه — يُعرض بلون أصفر في الحسابات */
   deferredDebtSettled?: boolean;
+  deferredSettledDetails?: AccountsLedgerDeferredSettledDetails;
+  notes?: string | null;
 } {
   return row.kind === 'Renewal';
 }
@@ -137,6 +141,86 @@ function ledgerRowClassName(row: AccountsLedgerEntry): string | undefined {
   if (row.deferredDebtSettled) return 'wakeel-table-row-deferred-settled';
   if (isUnpaidLedgerRenewalRow(row)) return 'wakeel-table-row-unpaid';
   return undefined;
+}
+
+function renderLedgerPreviewTable(
+  rows: AccountsLedgerEntry[],
+  formatNumber: (n: number, opts?: { suffix?: string }) => string,
+  formatDate: (d: string, opts?: Intl.DateTimeFormatOptions) => string,
+  rowClass?: (row: AccountsLedgerEntry) => string | undefined
+) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+      <table className="min-w-full text-right table-plain">
+        <thead className="bg-gray-50 dark:bg-gray-800/80">
+          <tr>
+            <th className="px-3 py-2 text-xs font-semibold">النوع</th>
+            <th className="px-3 py-2 text-xs font-semibold">طريقة الدفع</th>
+            <th className="px-3 py-2 text-xs font-semibold">واصل اشتراك</th>
+            <th className="px-3 py-2 text-xs font-semibold">وارد عام</th>
+            <th className="px-3 py-2 text-xs font-semibold">مبلغ الأجور</th>
+            <th className="px-3 py-2 text-xs font-semibold">تاريخ العملية</th>
+            <th className="px-3 py-2 text-xs font-semibold">رقم الفاتورة</th>
+            <th className="px-3 py-2 text-xs font-semibold">نفّذ بواسطة</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const renewal = isRenewalEntry(row) ? row : null;
+            return (
+              <tr
+                key={`${row.kind}-${row.id}`}
+                className={rowClass?.(row)}
+              >
+                <td className="px-3 py-2 text-xs whitespace-nowrap">
+                  <span
+                    className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                      row.kind === 'Renewal'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
+                    }`}
+                  >
+                    {ledgerKindLabel(row.kind)}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">
+                  {renewal ? activationPaymentMethodLabel(renewal.paymentMethod) : '—'}
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">
+                  {renewal?.nationalSubscriptionCost != null
+                    ? formatNumber(renewal.nationalSubscriptionCost, { suffix: ' د.ع' })
+                    : row.kind === 'DebtPayment' && row.generalIncome != null
+                      ? formatNumber(row.generalIncome, { suffix: ' د.ع' })
+                      : renewal
+                        ? formatNumber(0, { suffix: ' د.ع' })
+                        : '—'}
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap font-semibold">
+                  {row.generalIncome != null
+                    ? formatNumber(row.generalIncome, { suffix: ' د.ع' })
+                    : renewal
+                      ? formatNumber(0, { suffix: ' د.ع' })
+                      : '—'}
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">
+                  {row.serviceFeesAmount != null
+                    ? formatNumber(row.serviceFeesAmount, { suffix: ' د.ع' })
+                    : '—'}
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap font-medium">
+                  {formatDate(row.renewalDate, LEDGER_DATE_OPTIONS)}
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap font-mono">
+                  {renewal?.receiptNumber || row.receiptNumber || '—'}
+                </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">{row.executedByFullName || '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 const ReportsPage: React.FC = () => {
@@ -181,6 +265,8 @@ const ReportsPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(STANDARD_PAGE_SIZE_OPTIONS[0]);
   const [isExportingAccounts, setIsExportingAccounts] = useState(false);
   const [showAdvancedFiltersModal, setShowAdvancedFiltersModal] = useState(false);
+  const [deferredDetails, setDeferredDetails] = useState<AccountsLedgerDeferredSettledDetails | null>(null);
+  const [deferredDetailsReceipt, setDeferredDetailsReceipt] = useState<string>('');
 
   const {
     myRegions,
@@ -770,8 +856,8 @@ const ReportsPage: React.FC = () => {
                                     : '—'}
                               </td>
                               <td className="whitespace-nowrap">
-                                {renewal?.serviceFeesAmount != null
-                                  ? formatNumber(renewal.serviceFeesAmount, { suffix: ' د.ع' })
+                                {row.serviceFeesAmount != null
+                                  ? formatNumber(row.serviceFeesAmount, { suffix: ' د.ع' })
                                   : '—'}
                               </td>
                               <td className="whitespace-nowrap">
@@ -790,9 +876,26 @@ const ReportsPage: React.FC = () => {
                               <td className="whitespace-nowrap font-bold">
                                 {formatDate(row.createdAt, LEDGER_DATE_OPTIONS)}
                               </td>
-                              <td className="whitespace-nowrap text-xs">{renewal?.receiptNumber || '—'}</td>
+                              <td className="whitespace-nowrap text-xs">
+                                {renewal?.receiptNumber || row.receiptNumber || '—'}
+                              </td>
                               <td className="max-w-[220px] text-xs text-gray-700 dark:text-gray-300 whitespace-normal">
-                                {renewal?.notes || '—'}
+                                <div className="flex flex-col gap-1.5">
+                                  <span>{renewal?.notes || '—'}</span>
+                                  {renewal?.deferredDebtSettled && renewal.deferredSettledDetails && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDeferredDetails(renewal.deferredSettledDetails!);
+                                        setDeferredDetailsReceipt(renewal.receiptNumber || '—');
+                                      }}
+                                      className="inline-flex items-center gap-1 self-start px-2 py-1 rounded-md text-xs font-medium bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-100 dark:hover:bg-amber-900/60"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                      تفاصيل
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                               <td className="whitespace-nowrap">{row.executedByFullName || '—'}</td>
                               {canDeleteLedger && (
@@ -893,6 +996,63 @@ const ReportsPage: React.FC = () => {
                   إلغاء
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deferredDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              setDeferredDetails(null);
+              setDeferredDetailsReceipt('');
+            }}
+            aria-hidden
+          />
+          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-gray-200/80 dark:border-gray-700/80 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">تفاصيل التفعيل والتسديد</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  رقم الفاتورة: <span className="font-mono">{deferredDetailsReceipt}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeferredDetails(null);
+                  setDeferredDetailsReceipt('');
+                }}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="إغلاق"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-6">
+              <section>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                  سجل التفعيل الآجل (كما كان يظهر باللون الأحمر)
+                </h3>
+                {renderLedgerPreviewTable(
+                  [deferredDetails.activationDeferred],
+                  formatNumber,
+                  formatDate,
+                  () => 'wakeel-table-row-unpaid'
+                )}
+              </section>
+              <section>
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                  سجل/سجلات تسديد الدين لنفس الفاتورة
+                </h3>
+                {deferredDetails.payments.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">لا توجد سجلات تسديد.</p>
+                ) : (
+                  renderLedgerPreviewTable(deferredDetails.payments, formatNumber, formatDate)
+                )}
+              </section>
             </div>
           </div>
         </div>
