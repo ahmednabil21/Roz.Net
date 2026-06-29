@@ -95,7 +95,7 @@ const ReceiptHandoverPage: React.FC = () => {
     enabled: isAuthenticated && (!isAdmin || !!selectedAgentId),
   });
 
-  const regions = context?.regions ?? [];
+  const regions = useMemo(() => context?.regions ?? [], [context?.regions]);
 
   const selectedRegion: ReceiptHandoverRegion | undefined = useMemo(
     () => regions.find((r) => r.id === selectedRegionId),
