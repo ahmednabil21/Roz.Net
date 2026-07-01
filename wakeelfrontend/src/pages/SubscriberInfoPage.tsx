@@ -637,6 +637,7 @@ const SubscriberInfoPage: React.FC = () => {
                         onClick={() => setRenewalsPage((p) => Math.max(1, p - 1))}
                         className="p-2 rounded-xl disabled:opacity-40 text-[#2962FF] hover:bg-blue-50 transition-colors"
                         aria-label="الصفحة السابقة"
+                        
                       >
                         <ChevronRight className="w-5 h-5" />
                       </button>
