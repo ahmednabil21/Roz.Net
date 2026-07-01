@@ -338,10 +338,12 @@ const SubscriberInfoPage: React.FC = () => {
       <div className="min-h-screen font-cairo bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center p-4" dir="rtl" style={{ fontFamily: 'Cairo, sans-serif' }}>
         <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 sm:p-10 w-full max-w-[400px] text-center shadow-xl border border-white/60">
           <div className="mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#2962FF] to-[#1E40AF] shadow-lg shadow-blue-500/25 mb-5">
-              <img src={waklogo} alt="شعار الوكيل" className="w-14 h-14 rounded-xl object-contain" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800 mb-1">Al Wakeel</h1>
+            <img
+              src={waklogo}
+              alt="شعار الوكيل"
+              className="w-24 h-24 mx-auto mb-5 object-contain"
+            />
+            <h1 className="text-2xl font-bold text-slate-800 mb-1">شركة روز لخدمات الانترنت</h1>
             <p className="text-slate-500 text-sm">تطبيق المشترك</p>
           </div>
 
@@ -415,9 +417,11 @@ const SubscriberInfoPage: React.FC = () => {
               </p>
             )}
           </div>
-          <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <img src={waklogo} alt="" className="w-7 h-7 rounded-lg object-contain" />
-          </div>
+          <img
+            src={waklogo}
+            alt=""
+            className="w-10 h-10 object-contain flex-shrink-0"
+          />
         </div>
       </header>
 
