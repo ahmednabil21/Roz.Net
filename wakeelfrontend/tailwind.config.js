@@ -1,4 +1,17 @@
 /** @type {import('tailwindcss').Config} */
+const brand = {
+  50: '#eeecfd',
+  100: '#dcd9fb',
+  200: '#b9b3f7',
+  300: '#968df3',
+  400: '#7367ef',
+  500: '#2a15c8',
+  600: '#1801ad',
+  700: '#13018a',
+  800: '#0e0168',
+  900: '#090145',
+};
+
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
@@ -19,18 +32,10 @@ module.exports = {
         cairo: ['Cairo', 'sans-serif'],
       },
       colors: {
-        primary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-        },
+        primary: brand,
+        purple: brand,
+        indigo: brand,
+        violet: brand,
       },
     },
   },

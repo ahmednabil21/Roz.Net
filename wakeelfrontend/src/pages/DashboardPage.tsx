@@ -703,8 +703,8 @@ const DashboardPage: React.FC = () => {
           desktopSize="150px"
           mobileSize="150px"
           text="تحميل لوحة التحكم..."
-          backColor="#E8F2FC"
-          frontColor="#4645F6"
+          backColor="#eeecfd"
+          frontColor="#1801ad"
         />
       </div>
     );

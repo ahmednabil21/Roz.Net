@@ -45,7 +45,7 @@ export const DashboardCreditBalanceCard: React.FC<DashboardCreditBalanceCardProp
     onClick={onClick}
     className="relative w-full overflow-hidden rounded-2xl p-5 sm:p-6 text-white text-right shadow-xl shadow-indigo-950/20 transition-transform hover:-translate-y-0.5"
     style={{
-      background: 'linear-gradient(135deg, #0b1220 0%, #1e1b4b 45%, #3730a3 100%)',
+      background: 'linear-gradient(135deg, #090145 0%, #0e0168 45%, #1801ad 100%)',
     }}
   >
     <div className="pointer-events-none absolute -top-12 -left-12 h-44 w-44 rounded-full bg-white/5" />

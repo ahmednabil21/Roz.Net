@@ -509,9 +509,9 @@ class ApiService {
 
   constructor() {
     // API URL - Priority: 1. REACT_APP_API_URL, 2. في التطوير: محلي 5112, 3. إنتاج
-    // يجب أن ينتهي الرابط بـ /wakeel/api وليس /api فقط (مثلاً https://api-solid.execute-iq.com/wakeel/api)
-    const defaultForDev = 'https://api-solid.execute-iq.com/wakeel/api';
-    const defaultForProd = 'https://api-solid.execute-iq.com/wakeel/api';
+    // يجب أن ينتهي الرابط بـ /wakeel/api وليس /api فقط (مثلاً https://roz-api.execute-iq.com/wakeel/api)
+    const defaultForDev = 'https://roz-api.execute-iq.com/wakeel/api';
+    const defaultForProd = 'https://roz-api.execute-iq.com/wakeel/api';
     const baseURL = process.env.REACT_APP_API_URL
       || (process.env.NODE_ENV === 'development' ? defaultForDev : defaultForProd);
 

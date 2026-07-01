@@ -1,16 +1,16 @@
 {
-  "short_name": "الوكيل",
-  "name": "نظام إدارة الوكيل",
+  "short_name": "شركة روز لخدمات الانترنت",
+  "name": "نظام شركة روز لخدمات الانترنت",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "roz-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ],
   "start_url": "/wakeel/",
   "display": "standalone",
-  "theme_color": "#1f2937",
+  "theme_color": "#1801ad",
   "background_color": "#ffffff",
   "orientation": "portrait-primary"
 }

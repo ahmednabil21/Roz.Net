@@ -9,7 +9,7 @@ import {
   AgentAnnouncementDto,
 } from '../types';
 import { useDigits } from '../contexts/DigitsContext';
-import waklogo from '../images/waklogo.png';
+import waklogo from '../images/Rozlogo.png';
 import {
   User,
   LogOut,

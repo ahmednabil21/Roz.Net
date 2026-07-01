@@ -106,17 +106,11 @@ export function saveStoredOperationalResellerId(resellerId: string): void {
   }
 }
 
-/** يتحقق من جلسة واتساب للرسيلr أو أي رسيلr أو جلسة الوكيل (للتوافق) */
+/** جلسة واتساب الوكيل الواحدة لجميع رسيلراته ومناطقه */
 export function hasOperationalWhatsAppSession(
-  resellers: AgentReseller[],
-  resellerId?: string | null,
+  _resellers?: AgentReseller[],
+  _resellerId?: string | null,
   agentSessionId?: string | null
 ): boolean {
-  const trimmedResellerId = (resellerId ?? '').trim();
-  if (trimmedResellerId) {
-    const match = resellers.find((r) => r.id === trimmedResellerId);
-    if (match?.whatsAppSessionId?.trim()) return true;
-  }
-  if (resellers.some((r) => r.whatsAppSessionId?.trim())) return true;
   return !!(agentSessionId ?? '').trim();
 }

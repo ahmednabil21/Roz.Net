@@ -1000,7 +1000,7 @@ const SubscribersPage: React.FC = () => {
     return types.size > 1;
   }, [myResellers]);
   const [pendingActivateSubscriberId, setPendingActivateSubscriberId] = useState<string | null>(null);
-  const hasWhatsAppSession = hasOperationalWhatsAppSession(myResellers, selectedOperationalResellerId, myAgent?.whatsAppSessionId);
+  const hasWhatsAppSession = hasOperationalWhatsAppSession([], null, myAgent?.whatsAppSessionId);
 
   useEffect(() => {
     if (!isAgentOrSubAgentOrEmployee) return;
@@ -2804,7 +2804,7 @@ const SubscribersPage: React.FC = () => {
       return;
     }
     if (!hasWhatsAppSession) {
-      showError('إرسال واتساب', 'لم يتم حفظ معرف جلسة واتساب في Wakeel. افتح الإعدادات ← ربط واتساب ← ثم اضغط «حفظ معرف الجلسة في Wakeel».');
+      showError('إرسال واتساب', 'لم يتم ربط واتساب الوكيل. افتح الإعدادات ← ربط واتساب وأكمل الربط.');
       return;
     }
     const subscriberId = receipt.subscriberId;
@@ -2867,7 +2867,7 @@ const SubscribersPage: React.FC = () => {
       return;
     }
     if (!hasWhatsAppSession) {
-      showError('إرسال دين او التفاصيل', 'لم يتم حفظ معرف جلسة واتساب في Wakeel. افتح الإعدادات ← ربط واتساب ← ثم اضغط «حفظ معرف الجلسة في Wakeel».');
+      showError('إرسال دين او التفاصيل', 'لم يتم ربط واتساب الوكيل. افتح الإعدادات ← ربط واتساب وأكمل الربط.');
       return;
     }
     if (!subscriber.phoneNumber?.trim()) {
@@ -2905,7 +2905,7 @@ const SubscribersPage: React.FC = () => {
       return;
     }
     if (!hasWhatsAppSession) {
-      showError('إرسال دين او التفاصيل', 'لم يتم حفظ معرف جلسة واتساب في Wakeel. افتح الإعدادات ← ربط واتساب ← ثم اضغط «حفظ معرف الجلسة في Wakeel».');
+      showError('إرسال دين او التفاصيل', 'لم يتم ربط واتساب الوكيل. افتح الإعدادات ← ربط واتساب وأكمل الربط.');
       return;
     }
     try {
@@ -2942,7 +2942,7 @@ const SubscribersPage: React.FC = () => {
       return;
     }
     if (!hasWhatsAppSession) {
-      showError('رسالة تنبيه الاشتراك', 'لم يتم حفظ معرف جلسة واتساب في Wakeel. افتح الإعدادات ← ربط واتساب ← ثم اضغط «حفظ معرف الجلسة في Wakeel».');
+      showError('رسالة تنبيه الاشتراك', 'لم يتم ربط واتساب الوكيل. افتح الإعدادات ← ربط واتساب وأكمل الربط.');
       setShowActionsDropdown(false);
       return;
     }
@@ -2959,7 +2959,7 @@ const SubscribersPage: React.FC = () => {
       return;
     }
     if (!hasWhatsAppSession) {
-      showError('إرسال رسالة حر', 'لم يتم حفظ معرف جلسة واتساب في Wakeel. افتح الإعدادات ← ربط واتساب ← ثم اضغط «حفظ معرف الجلسة في Wakeel».');
+      showError('إرسال رسالة حر', 'لم يتم ربط واتساب الوكيل. افتح الإعدادات ← ربط واتساب وأكمل الربط.');
       return;
     }
     if (!subscriber.phoneNumber?.trim()) {
@@ -3237,8 +3237,8 @@ const SubscribersPage: React.FC = () => {
           desktopSize="150px"
           mobileSize="150px"
           text="تحميل المشتركين..."
-          backColor="#E8F2FC"
-          frontColor="#4645F6"
+          backColor="#eeecfd"
+          frontColor="#1801ad"
         />
       </div>
     );
@@ -5201,7 +5201,7 @@ const SubscribersPage: React.FC = () => {
 
               {/* Actions */}
               {!hasWhatsAppSession && (
-                <p className="text-sm text-amber-600 dark:text-amber-400 pt-2">لإرسال رسائل واتساب أضف معرف جلسة واتساب في الإعدادات.</p>
+                <p className="text-sm text-amber-600 dark:text-amber-400 pt-2">لإرسال رسائل واتساب اربط رقم الوكيل من الإعدادات ← ربط واتساب.</p>
               )}
               <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button

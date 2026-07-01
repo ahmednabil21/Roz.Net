@@ -15,8 +15,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: '/wakeel/logo192.png',
-      badge: '/wakeel/logo192.png',
+      icon: '/wakeel/roz-logo.png',
+      badge: '/wakeel/roz-logo.png',
       data: { url },
     })
   );

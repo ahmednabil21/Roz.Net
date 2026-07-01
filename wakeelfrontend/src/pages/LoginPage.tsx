@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 // import Turnstile from 'react-turnstile'; // خدمة Cloudflare Turnstile — معطّلة بتعليق
-import Lottie from 'lottie-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, User, Lock, AlertTriangle, RefreshCw } from 'lucide-react';
 import WifiLoaderComponent from '../components/WifiLoaderComponent';
 import { apiService, ApiService } from '../services/api';
 import { showSuccess } from '../utils/notifications';
-import isometricDataAnalysisAnimation from '../images/Isometric data analysis.json';
+import { BRAND_COLOR, BRAND_COLOR_LIGHT } from '../constants/branding';
+import rozLogo from '../images/Rozlogo.png';
+import personLoginImage from '../images/person login.png';
 
 // const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || '0x4AAAAAACh0LGLTfAOqhxi6';
 
@@ -164,8 +165,8 @@ const LoginPage: React.FC = () => {
           desktopSize="150px"
           mobileSize="150px"
           text="جاري تسجيل الدخول..."
-          backColor="#F0EAFE"
-          frontColor="#8B5CF6"
+          backColor={BRAND_COLOR_LIGHT}
+          frontColor={BRAND_COLOR}
         />
       </div>
     );
@@ -180,8 +181,13 @@ const LoginPage: React.FC = () => {
         <div className="flex-1 max-w-sm sm:max-w-md w-full order-2 lg:order-1">
           <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md shadow-2xl rounded-2xl border border-white/60 dark:border-gray-700/50 p-4 sm:p-6 lg:p-8">
             <div className="text-center mb-4 sm:mb-6">
+              <img
+                src={rozLogo}
+                alt="روز"
+                className="mx-auto mb-4 h-20 w-auto sm:h-24 object-contain dark:brightness-0 dark:invert"
+              />
               <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                نظام الوكيل
+                نظام شركة روز لخدمات الانترنت
               </h2>
               <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                 تسجيل الدخول إلى حسابك
@@ -310,20 +316,19 @@ const LoginPage: React.FC = () => {
             </form>
 
             <div className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-4 sm:mt-6">
-              <p>جميع الحقوق محفوظة لنظام الوكيل 2026 ©</p>
+              <p>جميع الحقوق محفوظة لشركة انجاز عراق 2026 ©</p>
             </div>
           </div>
         </div>
 
-        {/* Animated System Visual Section */}
-        <div className="flex-1 flex flex-col items-center justify-center lg:pl-8 order-1 lg:order-2">
-          <div className="text-center bg-white/60 dark:bg-gray-800/40 rounded-2xl p-5 sm:p-6 border border-white/60 dark:border-gray-700/40 backdrop-blur-sm shadow-lg">
-            <div className="mx-auto mb-3 h-48 w-48 sm:h-56 sm:w-56 lg:h-72 lg:w-72">
-              <Lottie
-                animationData={isometricDataAnalysisAnimation}
-                loop
-                autoplay
-                className="h-full w-full"
+        {/* Brand Visual Section */}
+        <div className="flex-1 flex flex-col items-center justify-center lg:pl-8 order-1 lg:order-2 w-full max-w-xl lg:max-w-2xl">
+          <div className="w-full text-center bg-white/60 dark:bg-gray-800/40 rounded-2xl p-4 sm:p-6 lg:p-8 border border-white/60 dark:border-gray-700/40 backdrop-blur-sm shadow-lg">
+            <div className="mx-auto mb-4 flex h-64 w-full max-w-sm sm:h-80 sm:max-w-md lg:h-[28rem] lg:max-w-lg xl:h-[32rem] xl:max-w-xl items-center justify-center">
+              <img
+                src={personLoginImage}
+                alt="تسجيل الدخول"
+                className="h-full w-full object-contain drop-shadow-lg"
               />
             </div>
             <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 font-medium">

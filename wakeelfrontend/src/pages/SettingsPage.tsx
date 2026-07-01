@@ -294,7 +294,7 @@ function SettingsPage() {
     },
   });
 
-  const pollResellerWhatsAppStatus = (resellerId: string) => {
+  const pollAgentWhatsAppStatus = (agentId: string) => {
     clearWaStatusPoll();
     setWaStatusLoading(true);
     setWaError(null);
@@ -308,14 +308,13 @@ function SettingsPage() {
         return;
       }
       try {
-        const s = await apiService.getResellerWhatsAppStatus(resellerId);
+        const s = await apiService.getAgentWhatsAppStatus(agentId);
         setWaStatus(s);
         if (s.isLoggedIn) {
           clearWaStatusPoll();
           setWaStatusLoading(false);
           setWaSuccessInfo('واتساب مرتبط بنجاح.');
-          queryClient.invalidateQueries({ queryKey: ['myResellers'] });
-          queryClient.invalidateQueries({ queryKey: ['myRegions'] });
+          queryClient.invalidateQueries({ queryKey: ['myAgent'] });
         }
       } catch {
         /* keep polling */
@@ -737,14 +736,6 @@ function SettingsPage() {
   const [resellerPassword, setResellerPassword] = useState('');
   const [resellerDisplayOrder, setResellerDisplayOrder] = useState(0);
   const [resellerRegionId, setResellerRegionId] = useState('');
-  const [waSelectedResellerId, setWaSelectedResellerId] = useState('');
-  useEffect(() => {
-    if (!waSelectedResellerId && myResellers.length > 0) {
-      setWaSelectedResellerId(myResellers[0].id);
-    }
-  }, [myResellers, waSelectedResellerId]);
-
-  const waSelectedReseller = myResellers.find((r) => r.id === waSelectedResellerId) ?? null;
   // مودال إعلان مميز أثناء سحب المشتركين من SAS في الخلفية (يُعرض عند انتهاء مهلة الاتصال لمدة 5 دقائق كحد أقصى)
   const [showSasSyncPromoModal, setShowSasSyncPromoModal] = useState(false);
   useEffect(() => {
@@ -1122,13 +1113,32 @@ function SettingsPage() {
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
-  const updateResellerWhatsAppSessionMutation = useMutation({
-    mutationFn: ({ resellerId, sessionId }: { resellerId: string; sessionId: string }) =>
-      apiService.updateResellerWhatsAppSession(resellerId, { whatsAppSessionId: sessionId.trim() }),
+  const updateAgentWhatsAppSessionMutation = useMutation({
+    mutationFn: async ({ sessionId }: { sessionId: string }) => {
+      if (!myAgent) throw new Error('لا يوجد وكيل');
+      const updatePayload: import('../types').AgentUpdateRequest = {
+        fullName: myAgent.fullName,
+        companyName: myAgent.companyName,
+        phone: myAgent.phone,
+        address: myAgent.address,
+        governorate: myAgent.governorate,
+        isActive: myAgent.isActive,
+        subscriptionType: myAgent.subscriptionType,
+        subscriptionStartDate: myAgent.subscriptionStartDate,
+        subscriptionEndDate: myAgent.subscriptionEndDate,
+        renewalPeriod: myAgent.renewalPeriod,
+        renewalCalculationType: myAgent.renewalCalculationType,
+        serviceType: myAgent.serviceType,
+        sasBaseUrl: myAgent.sasBaseUrl,
+        sasUsername: myAgent.sasUsername,
+        ftthBaseUrl: myAgent.ftthBaseUrl,
+        ftthUsername: myAgent.ftthUsername,
+        whatsAppSessionId: sessionId.trim(),
+      };
+      return apiService.updateAgent(myAgent.id, updatePayload);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myResellers'] });
-      queryClient.invalidateQueries({ queryKey: ['myRegions'] });
-      showSuccess('تم الحفظ', 'تم حفظ معرف جلسة واتساب للرسيلر بنجاح.');
+      queryClient.invalidateQueries({ queryKey: ['myAgent'] });
     },
     onError: (err: any) => showError('خطأ', ApiService.showError(err)),
   });
@@ -1505,8 +1515,8 @@ function SettingsPage() {
           desktopSize="150px"
           mobileSize="150px"
           text="حفظ الإعدادات..."
-          backColor="#E8F2FC"
-          frontColor="#4645F6"
+          backColor="#eeecfd"
+          frontColor="#1801ad"
         />
       </div>
     );
@@ -2537,11 +2547,6 @@ function SettingsPage() {
                                   <span className="mr-2 text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                                     {serviceTypeLabel(r.serviceType)}
                                   </span>
-                                  {r.whatsAppSessionId?.trim() && (
-                                    <span className="mr-2 text-xs px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-                                      واتساب
-                                    </span>
-                                  )}
                                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{r.baseUrl}</p>
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -3553,7 +3558,7 @@ function SettingsPage() {
             </div>
           )}
 
-          {/* ربط جلسة واتساب — الوكيل/المدير الثانوي يعدّلون؛ الموظف يرى جلسة الوكيل (نفس الجلسة للموظف والمدير الثانوي) */}
+          {/* ربط جلسة واتساب — جلسة واحدة للوكيل لجميع الرسيلرز والمناطق */}
           {isAgentOrSubAgentOrEmployee && activeSection === 'whatsapp' && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-center space-x-3 mb-6">
@@ -3562,198 +3567,160 @@ function SettingsPage() {
                   ربط واتساب
                 </h2>
               </div>
-              {isEmployee ? (
-                <>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    جلسة واتساب تابعة للرسيلر/الوكيل؛ إرسال الرسائل يستخدم جلسة الرسيلر المرتبط بالمشترك.
-                  </p>
-                  {myAgentLoading ? (
-                    <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل البيانات...</div>
-                  ) : (
-                    <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700/50 space-y-2">
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرسيلر</p>
-                      <select
-                        value={waSelectedResellerId}
-                        onChange={(e) => setWaSelectedResellerId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
-                      >
-                        {myResellers.map((r) => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </select>
-                      <p className="text-sm text-gray-900 dark:text-white font-mono">
-                        {waSelectedReseller?.whatsAppSessionId?.trim() || myAgent?.whatsAppSessionId?.trim() || '— لا توجد جلسة محفوظة'}
-                      </p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-          
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                رقم واتساب واحد لحساب الوكيل يُستخدم لإرسال الرسائل لجميع الرسيلرز والمناطق.
+                {isEmployee && ' الموظفون يرون حالة الربط فقط.'}
+              </p>
               {myAgentLoading ? (
                 <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل البيانات...</div>
+              ) : !myAgent ? (
+                <div className="py-4 text-amber-600 dark:text-amber-400">تعذّر تحميل بيانات الوكيل.</div>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الرسيلر *</label>
-                    <select
-                      value={waSelectedResellerId}
-                      onChange={(e) => {
-                        setWaSelectedResellerId(e.target.value);
-                        setWaError(null);
-                        setPairCode(null);
-                        setWaStatus(null);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    >
-                      {myResellers.length === 0 ? (
-                        <option value="">— أضف رسيلر أولاً —</option>
-                      ) : (
-                        myResellers.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}{r.regionName ? ` (${r.regionName})` : ''}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700/50">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">معرّف الجهاز المحفوظ</p>
+                    <p className="text-sm text-gray-900 dark:text-white font-mono">
+                      {myAgent.whatsAppSessionId?.trim() || '— لا توجد جلسة محفوظة'}
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      رقم الهاتف
-                    </label>
-                    <input
-                      type="tel"
-                      value={pairPhoneOverride}
-                      onChange={(e) => {
-                        setPairPhoneOverride(e.target.value);
-                        setWaError(null);
-                      }}
-                      placeholder="مثال: 9647XXXXXXXX"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <button
-                      type="button"
-                      disabled={
-                        !waSelectedResellerId ||
-                        !pairPhoneOverride.trim() ||
-                        waPairLoading ||
-                        waStatusLoading
-                      }
-                      onClick={async () => {
-                        if (!waSelectedResellerId) {
-                          showError('خطأ', 'اختر الرسيلر أولاً.');
-                          return;
-                        }
-                        const phoneParam = normalizeWhatsAppDeviceId(pairPhoneOverride);
-                        if (!phoneParam) {
-                          showError('خطأ', 'أدخل رقم هاتف صحيح.');
-                          return;
-                        }
-                        setWaError(null);
-                        setWaSuccessInfo(null);
-                        setPairCode(null);
-                        setPairHint(null);
-                        setWaStatus(null);
-                        clearWaStatusPoll();
-                        setWaPairLoading(true);
-                        try {
-                          const currentSessionId = (waSelectedReseller?.whatsAppSessionId || '').trim();
-                          if (!currentSessionId || currentSessionId !== phoneParam) {
-                            await updateResellerWhatsAppSessionMutation.mutateAsync({
-                              resellerId: waSelectedResellerId,
-                              sessionId: phoneParam,
-                            });
+                  {!isEmployee && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          رقم الهاتف (لربط الواتساب)
+                        </label>
+                        <input
+                          type="tel"
+                          value={pairPhoneOverride}
+                          onChange={(e) => {
+                            setPairPhoneOverride(e.target.value);
+                            setWaError(null);
+                          }}
+                          placeholder="مثال: 9647XXXXXXXX"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                          type="button"
+                          disabled={!pairPhoneOverride.trim() || waPairLoading || waStatusLoading}
+                          onClick={async () => {
+                            const phoneParam = normalizeWhatsAppDeviceId(pairPhoneOverride);
+                            if (!phoneParam) {
+                              showError('خطأ', 'أدخل رقم هاتف صحيح.');
+                              return;
+                            }
+                            setWaError(null);
+                            setWaSuccessInfo(null);
+                            setPairCode(null);
+                            setPairHint(null);
+                            setWaStatus(null);
+                            clearWaStatusPoll();
+                            setWaPairLoading(true);
+                            try {
+                              const currentSessionId = (myAgent.whatsAppSessionId || '').trim();
+                              if (!currentSessionId || currentSessionId !== phoneParam) {
+                                await updateAgentWhatsAppSessionMutation.mutateAsync({ sessionId: phoneParam });
+                              }
+                              await apiService.postAgentWhatsAppDevice(myAgent.id);
+                              const res = await apiService.postAgentWhatsAppPairCode(myAgent.id, phoneParam);
+                              setPairCode(res.pairCode || '');
+                              setPairHint(
+                                'اذهب إلى واتساب > الأجهزة المرتبطة > ربط عبر رقم الهاتف > أدخل الكود'
+                              );
+                            } catch (e: any) {
+                              const msg = mapWhatsAppBackendError(ApiService.showError(e));
+                              setWaError(msg);
+                              showError('كود الربط', msg);
+                            } finally {
+                              setWaPairLoading(false);
+                            }
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {waPairLoading ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              <span>جاري جلب الكود...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Key className="h-4 w-4" />
+                              <span>احصل على كود الربط</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            !(myAgent.whatsAppSessionId?.trim()) ||
+                            waPairLoading ||
+                            waStatusLoading ||
+                            waCheckStatusLoading
                           }
-                          await apiService.postResellerWhatsAppDevice(waSelectedResellerId);
-                          const res = await apiService.postResellerWhatsAppPairCode(waSelectedResellerId, phoneParam);
-                          setPairCode(res.pairCode || '');
-                          setPairHint(
-                            'اذهب إلى واتساب > الأجهزة المرتبطة > ربط عبر رقم الهاتف > أدخل الكود'
-                          );
-                        } catch (e: any) {
-                          const msg = mapWhatsAppBackendError(ApiService.showError(e));
-                          setWaError(msg);
-                          showError('كود الربط', msg);
-                        } finally {
-                          setWaPairLoading(false);
-                        }
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {waPairLoading ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          <span>جاري جلب الكود...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Key className="h-4 w-4" />
-                          <span>احصل على كود الربط</span>
-                        </>
-                      )}
-                    </button>
+                          onClick={async () => {
+                            setWaError(null);
+                            try {
+                              setWaCheckStatusLoading(true);
+                              const s = await apiService.getAgentWhatsAppStatus(myAgent.id);
+                              setWaStatus(s);
+                              setWaSuccessInfo(s.isLoggedIn ? 'واتساب مرتبط حالياً.' : 'واتساب غير مربوط بعد.');
+                            } catch (e: any) {
+                              const msg = mapWhatsAppBackendError(ApiService.showError(e));
+                              setWaError(msg);
+                              showError('فحص الحالة', msg);
+                            } finally {
+                              setWaCheckStatusLoading(false);
+                            }
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {waCheckStatusLoading ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              <span>جاري الفحص...</span>
+                            </>
+                          ) : (
+                            <span>تحقق من الحالة</span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!pairCode || waStatusLoading || waCheckStatusLoading}
+                          onClick={() => {
+                            setWaStatus(null);
+                            setWaError(null);
+                            setWaSuccessInfo(null);
+                            pollAgentWhatsAppStatus(myAgent.id);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {waStatusLoading ? 'جاري التحقق...' : 'حفظ / تم الربط'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {isEmployee && myAgent.whatsAppSessionId?.trim() && (
                     <button
                       type="button"
-                      disabled={
-                        !waSelectedResellerId ||
-                        !(waSelectedReseller?.whatsAppSessionId?.trim()) ||
-                        waPairLoading ||
-                        waStatusLoading ||
-                        waCheckStatusLoading
-                      }
+                      disabled={waCheckStatusLoading}
                       onClick={async () => {
-                        if (!waSelectedResellerId) return;
                         setWaError(null);
                         try {
                           setWaCheckStatusLoading(true);
-                          const s = await apiService.getResellerWhatsAppStatus(waSelectedResellerId);
+                          const s = await apiService.getAgentWhatsAppStatus(myAgent.id);
                           setWaStatus(s);
-                          if (s.isLoggedIn) {
-                            setWaSuccessInfo('واتساب مرتبط حالياً.');
-                          } else {
-                            setWaSuccessInfo('واتساب غير مربوط بعد.');
-                          }
                         } catch (e: any) {
-                          const msg = mapWhatsAppBackendError(ApiService.showError(e));
-                          setWaError(msg);
-                          showError('فحص الحالة', msg);
+                          setWaError(mapWhatsAppBackendError(ApiService.showError(e)));
                         } finally {
                           setWaCheckStatusLoading(false);
                         }
                       }}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-md text-sm"
                     >
-                      {waCheckStatusLoading ? (
-                        <>
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                          <span>جاري الفحص...</span>
-                        </>
-                      ) : (
-                        <span>تحقق من الحالة</span>
-                      )}
+                      {waCheckStatusLoading ? 'جاري الفحص...' : 'تحقق من حالة الربط'}
                     </button>
-                    <button
-                      type="button"
-                      disabled={
-                        !waSelectedResellerId ||
-                        !pairCode ||
-                        waStatusLoading ||
-                        waCheckStatusLoading
-                      }
-                      onClick={async () => {
-                        if (!waSelectedResellerId) return;
-                        setWaStatus(null);
-                        setWaError(null);
-                        setWaSuccessInfo(null);
-                        pollResellerWhatsAppStatus(waSelectedResellerId);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {waStatusLoading ? 'جاري التحقق...' : 'حفظ / تم الربط'}
-                    </button>
-                  </div>
+                  )}
                   <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-2">
                     <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
                       تعليمات مهمة لتجنّب حظر رقم واتساب
@@ -3768,29 +3735,29 @@ function SettingsPage() {
                       <li>مسؤولية الاستخدام تقع على صاحب الرقم؛ النظام يوفر الإرسال ولا تضمن قبول واتساب لكل رسالة.</li>
                     </ul>
                   </div>
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 space-y-3">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                      طريقة الربط
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      افتح واتساب ثم: الأجهزة المرتبطة &gt; ربط عبر رقم الهاتف &gt; أدخل Pair Code الظاهر لك هنا.
-                    </p>
-                    <a
-                      href="https://image2url.com/r2/default/images/1774490728324-11c15aa4-499b-4d58-99ef-54d32796e1ac.jpeg"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary-600 dark:text-primary-400 inline-flex items-center gap-1"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      فتح صورة الطريقة بحجم كامل
-                    </a>
-                    <img
-                      src="https://image2url.com/r2/default/images/1774490728324-11c15aa4-499b-4d58-99ef-54d32796e1ac.jpeg"
-                      alt="طريقة ربط واتساب عبر رقم الهاتف"
-                      className="w-full max-w-md rounded-md border border-gray-200 dark:border-gray-700 object-contain bg-white"
-                      loading="lazy"
-                    />
-                  </div>
+                  {!isEmployee && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-4 space-y-3">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">طريقة الربط</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        افتح واتساب ثم: الأجهزة المرتبطة &gt; ربط عبر رقم الهاتف &gt; أدخل Pair Code الظاهر لك هنا.
+                      </p>
+                      <a
+                        href="https://image2url.com/r2/default/images/1774490728324-11c15aa4-499b-4d58-99ef-54d32796e1ac.jpeg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary-600 dark:text-primary-400 inline-flex items-center gap-1"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        فتح صورة الطريقة بحجم كامل
+                      </a>
+                      <img
+                        src="https://image2url.com/r2/default/images/1774490728324-11c15aa4-499b-4d58-99ef-54d32796e1ac.jpeg"
+                        alt="طريقة ربط واتساب عبر رقم الهاتف"
+                        className="w-full max-w-md rounded-md border border-gray-200 dark:border-gray-700 object-contain bg-white"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
                   {pairCode != null && pairCode !== '' && (
                     <div className="rounded-lg border border-gray-200 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700/50 space-y-2">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Pair Code</p>
@@ -3831,14 +3798,7 @@ function SettingsPage() {
                     )}
                     {waError && <p className="text-sm text-amber-600 dark:text-amber-400">{waError}</p>}
                   </div>
-                  {myAgent?.whatsAppSessionId && (
-                    <p className="text-sm text-green-600 dark:text-green-400">
-                      معرّف الجهاز المحفوظ حالياً: {myAgent.whatsAppSessionId}
-                    </p>
-                  )}
                 </div>
-              )}
-                </>
               )}
             </div>
           )}
