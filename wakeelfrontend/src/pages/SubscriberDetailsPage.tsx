@@ -212,10 +212,6 @@ const SubscriberDetailsPage: React.FC = () => {
     queryKey: ['myAgent'],
     queryFn: () => apiService.getMyAgent(),
   });
-  const { data: myResellers = [] } = useQuery({
-    queryKey: ['myResellers'],
-    queryFn: () => apiService.getMyResellers(),
-  });
   const hasWhatsAppSession = hasOperationalWhatsAppSession([], null, myAgent?.whatsAppSessionId);
 
   const {
