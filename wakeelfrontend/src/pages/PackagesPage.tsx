@@ -131,6 +131,7 @@ const PackagesPage: React.FC = () => {
 
   const packageTypeBadge = (t?: ProfilePackageType) => {
     if (t === ProfilePackageType.Extension) return 'تمديد';
+    if (t === ProfilePackageType.Pin) return 'PIN';
     if (t === ProfilePackageType.SpecialOffer) return 'عرض خاص';
     return 'اشتراك';
   };
@@ -235,6 +236,8 @@ const PackagesPage: React.FC = () => {
         : 0,
       regionId: formRegionId,
       agentResellerId: formResellerId,
+      balanceDeductionAmount:
+        formData.packageType === ProfilePackageType.Pin ? 0 : formData.balanceDeductionAmount ?? 0,
       includedMaterialIds:
         formData.packageType === ProfilePackageType.SpecialOffer
           ? formData.includedMaterialIds?.filter(Boolean) ?? []
@@ -267,6 +270,7 @@ const PackagesPage: React.FC = () => {
       packageType: type,
       originalPrice: type === ProfilePackageType.Extension ? 0 : prev.originalPrice,
       salePrice: type === ProfilePackageType.Extension ? 0 : prev.salePrice,
+      balanceDeductionAmount: type === ProfilePackageType.Pin ? 0 : prev.balanceDeductionAmount,
       includedMaterialIds: type === ProfilePackageType.SpecialOffer ? prev.includedMaterialIds ?? [] : [],
     }));
   };
@@ -295,6 +299,7 @@ const PackagesPage: React.FC = () => {
       packageType: type,
       originalPrice: type === ProfilePackageType.Extension ? 0 : prev.originalPrice,
       salePrice: type === ProfilePackageType.Extension ? 0 : prev.salePrice,
+      balanceDeductionAmount: type === ProfilePackageType.Pin ? 0 : prev.balanceDeductionAmount,
       includedMaterialIds: type === ProfilePackageType.SpecialOffer ? prev.includedMaterialIds ?? [] : [],
     }));
   };
@@ -336,6 +341,8 @@ const PackagesPage: React.FC = () => {
           : 0,
         regionId: editFormRegionId,
         agentResellerId: editFormResellerId,
+        balanceDeductionAmount:
+          editFormData.packageType === ProfilePackageType.Pin ? 0 : editFormData.balanceDeductionAmount ?? 0,
         includedMaterialIds:
           editFormData.packageType === ProfilePackageType.SpecialOffer
             ? editFormData.includedMaterialIds?.filter(Boolean) ?? []
@@ -685,7 +692,7 @@ const PackagesPage: React.FC = () => {
                 >
                   <option value={ProfilePackageType.Subscription}>باقة اشتراك</option>
                   <option value={ProfilePackageType.Extension}>تمديد</option>
-                  <option value={ProfilePackageType.SpecialOffer}>عرض خاص</option>
+                  <option value={ProfilePackageType.Pin}>PIN</option>
                 </select>
               </div>
 
@@ -729,6 +736,13 @@ const PackagesPage: React.FC = () => {
               </>
               )}
 
+              {formData.packageType === ProfilePackageType.Pin && (
+                <div className="md:col-span-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                  باقة PIN — كود تفعيل وليس رصيداً. لا يُستقطَع أي مبلغ من رصيد الرسيلر عند التفعيل.
+                </div>
+              )}
+
+              {formData.packageType !== ProfilePackageType.Pin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   استقطاع الرصيد عند التفعيل (د.ع) *
@@ -748,6 +762,7 @@ const PackagesPage: React.FC = () => {
                   يُخصم من رصيد الرسيلر/الوكيل عند كل تفعيل (مستقل عن سعر المشترك).
                 </p>
               </div>
+              )}
 
               <div className="flex items-center">
                 <input
@@ -957,7 +972,7 @@ const PackagesPage: React.FC = () => {
                 >
                   <option value={ProfilePackageType.Subscription}>باقة اشتراك</option>
                   <option value={ProfilePackageType.Extension}>تمديد</option>
-                  <option value={ProfilePackageType.SpecialOffer}>عرض خاص</option>
+                  <option value={ProfilePackageType.Pin}>PIN</option>
                 </select>
               </div>
 
@@ -1001,6 +1016,13 @@ const PackagesPage: React.FC = () => {
               </>
               )}
 
+              {editFormData.packageType === ProfilePackageType.Pin && (
+                <div className="md:col-span-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                  باقة PIN — كود تفعيل وليس رصيداً. لا يُستقطَع أي مبلغ من رصيد الرسيلر عند التفعيل.
+                </div>
+              )}
+
+              {editFormData.packageType !== ProfilePackageType.Pin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   استقطاع الرصيد عند التفعيل (د.ع) *
@@ -1020,6 +1042,7 @@ const PackagesPage: React.FC = () => {
                   يُخصم من رصيد الرسيلر/الوكيل عند كل تفعيل (مستقل عن سعر المشترك).
                 </p>
               </div>
+              )}
 
               <div className="flex items-center">
                 <input

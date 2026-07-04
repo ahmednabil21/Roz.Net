@@ -20,7 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasPageAction } from '../utils/employeePermissions';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
+import { Subscriber, SubscriptionStatus, SubscriptionType, SubscriberCreateRequest, SubscriberUpdateRequest, Profile, RenewalData, PaymentStatus, ActivationPaymentMethod, RenewalActivationChannel, PaginatedResponse, PaginationParams, UserRole, ServiceType, SubscriberNoteType, EARTHLINK_USER_MANAGEMENT_URL, AgentReseller, AgentRegion, ProfilePackageType, ServiceFees, SubscriptionDiscount, type SyncSubscribersDataItem, type SyncSubscribersRequest, type UpdateSubscriptionRequest, type UpdateSubscriptionResponse, type SaveSubscriberFromSyncRequest, type TransactionItem, type CashbackSynchronizationFtthResponse, type CashbackSynchronizationFtthRow, type FtthSubscriptionsCompareResponse, type FtthSubscriptionsCompareItem, type FtthCompareSyncContext, type FtthSyncPeriodDraft, type FtthAppTransactionsResponse, type FtthAppTransactionsItem, type FtthTransactionAmount } from '../types';
 import QRCode from 'qrcode';
 import EditSubscriberModal from '../components/EditSubscriberModal';
 import AddNoteModal from '../components/AddNoteModal';
@@ -678,6 +678,7 @@ const SubscribersPage: React.FC = () => {
     serviceFeesAmountPaid: undefined,
     activationPaymentMethod: ActivationPaymentMethod.Cash,
     activationChannel: RenewalActivationChannel.Normal,
+    cardNumber: '',
   });
   /** مفعّل = تُضاف أجور الخدمة للفاتورة؛ مطفأ = لا يُحسب ولا يُسجَّل دين */
   const [activationServiceFeesEnabled, setActivationServiceFeesEnabled] = useState<Record<string, boolean>>({});
@@ -807,6 +808,26 @@ const SubscribersPage: React.FC = () => {
   const activationServiceFeesTotal = React.useMemo(
     () => enabledActivationServiceFees.reduce((sum, f) => sum + (f.price ?? 0), 0),
     [enabledActivationServiceFees]
+  );
+
+  // خصومات الاشتراكات المطبَّقة على رسيلر المشترك — تظهر وتُخصم فقط عند الدفع نقداً أو ماستر.
+  const { data: activationSubscriptionDiscounts = [] } = useQuery<SubscriptionDiscount[]>({
+    queryKey: ['subscriptionDiscounts', 'activation', renewalResellerIdForProfiles ?? '__no_reseller__'],
+    queryFn: () => apiService.getSubscriptionDiscounts(undefined, renewalResellerIdForProfiles!),
+    enabled: showRenewalModal && !!renewalResellerIdForProfiles,
+  });
+
+  const activationSubscriptionDiscount = React.useMemo(
+    () => activationSubscriptionDiscounts.reduce((sum, d) => sum + (d.amount ?? 0), 0),
+    [activationSubscriptionDiscounts]
+  );
+
+  const subscriptionDiscountForMethod = React.useCallback(
+    (method?: ActivationPaymentMethod) =>
+      method === ActivationPaymentMethod.Cash || method === ActivationPaymentMethod.Master
+        ? activationSubscriptionDiscount
+        : 0,
+    [activationSubscriptionDiscount]
   );
 
   const isActivationServiceFeeFullyPaid = React.useCallback(
@@ -1103,8 +1124,18 @@ const SubscribersPage: React.FC = () => {
   const renewalSubscriptionPrice = React.useMemo(() => {
     const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
     if (!selectedProfile || selectedProfile.packageType === ProfilePackageType.Extension) return 0;
-    return renewalData.overrideSalePrice || selectedProfile.salePrice || 0;
-  }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice]);
+    const base = renewalData.overrideSalePrice || selectedProfile.salePrice || 0;
+    const discount = Math.min(subscriptionDiscountForMethod(renewalData.activationPaymentMethod), base);
+    return Math.max(0, base - discount);
+  }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice, renewalData.activationPaymentMethod, subscriptionDiscountForMethod]);
+
+  // مبلغ خصم الاشتراك الفعّال المعروض في مودال التفعيل (نقد/ماستر فقط)
+  const renewalActiveSubscriptionDiscount = React.useMemo(() => {
+    const selectedProfile = renewalInfo?.availableProfiles?.find((p) => p.id === renewalData.newProfileId);
+    if (!selectedProfile || selectedProfile.packageType === ProfilePackageType.Extension) return 0;
+    const base = renewalData.overrideSalePrice || selectedProfile.salePrice || 0;
+    return Math.min(subscriptionDiscountForMethod(renewalData.activationPaymentMethod), base);
+  }, [renewalInfo, renewalData.newProfileId, renewalData.overrideSalePrice, renewalData.activationPaymentMethod, subscriptionDiscountForMethod]);
 
   const ftthMultiPeriodBilling = !!(ftthCompareSyncContext && ftthSyncPeriods.length > 1);
 
@@ -2159,7 +2190,8 @@ const SubscribersPage: React.FC = () => {
   const applyRenewalAmountsForProfile = (
     salePrice: number,
     isExtension: boolean,
-    fullyReceived: boolean
+    fullyReceived: boolean,
+    subscriptionDiscount: number = 0
   ) => {
     if (isExtension) {
       return {
@@ -2171,17 +2203,20 @@ const SubscribersPage: React.FC = () => {
         paymentStatus: PaymentStatus.Paid,
       };
     }
+    // overrideSalePrice يبقى السعر الأساسي للباقة؛ الباكند يخصم مبلغ خصم الاشتراك عند الدفع نقداً/ماستر.
+    const effectiveDiscount = Math.min(Math.max(0, subscriptionDiscount), salePrice);
+    const netPrice = Math.max(0, salePrice - effectiveDiscount);
     if (fullyReceived) {
       return {
         overrideSalePrice: salePrice,
-        amountPaid: salePrice,
+        amountPaid: netPrice,
         remainingAmount: 0,
         debtDescription: '',
         debtDueDate: '',
         paymentStatus: PaymentStatus.Paid,
       };
     }
-    const remaining = salePrice;
+    const remaining = netPrice;
     return {
       overrideSalePrice: salePrice,
       amountPaid: 0,
@@ -2205,15 +2240,21 @@ const SubscribersPage: React.FC = () => {
       RenewalActivationChannel.CustomerWallet;
     const subscriptionFullyPaid = period.subscriptionFullyPaid !== false;
 
+    // خصم الاشتراك: نقد/ماستر فقط. overrideSalePrice يبقى السعر الأساسي والباكند يخصم منه.
+    const periodDiscount = !isExtension && !isDeferred && !isCustomerWallet
+      ? Math.min(subscriptionDiscountForMethod(baseRenewal.activationPaymentMethod), salePrice)
+      : 0;
+    const netSalePrice = Math.max(0, salePrice - periodDiscount);
+
     let amountPaid = 0;
     let remaining = 0;
     let debtDescription = '';
     if (!isExtension && !isDeferred && !isCustomerWallet) {
       if (subscriptionFullyPaid) {
-        amountPaid = salePrice;
+        amountPaid = netSalePrice;
       } else {
         amountPaid = period.amountPaid ?? 0;
-        remaining = Math.max(0, salePrice - amountPaid);
+        remaining = Math.max(0, netSalePrice - amountPaid);
         debtDescription =
           period.debtDescription ||
           (remaining > 0 ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}` : '');
@@ -2267,9 +2308,10 @@ const SubscribersPage: React.FC = () => {
     if (!selectedProfile) return;
     const salePrice = selectedProfile.salePrice || 0;
     const isExtension = selectedProfile.packageType === ProfilePackageType.Extension;
+    const discount = subscriptionDiscountForMethod(renewalData.activationPaymentMethod);
     setRenewalData((prev) => ({
       ...prev,
-      ...applyRenewalAmountsForProfile(salePrice, isExtension, fullyReceived),
+      ...applyRenewalAmountsForProfile(salePrice, isExtension, fullyReceived, discount),
     }));
   };
 
@@ -2295,7 +2337,7 @@ const SubscribersPage: React.FC = () => {
       ...prev,
       activationChannel: RenewalActivationChannel.Normal,
       activationPaymentMethod: ActivationPaymentMethod.Cash,
-      ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+      ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived, subscriptionDiscountForMethod(ActivationPaymentMethod.Cash)),
     }));
   };
 
@@ -2358,13 +2400,19 @@ const SubscribersPage: React.FC = () => {
           const sp = renewalInfo?.availableProfiles?.find((p) => p.id === rawId);
           const ext = sp?.packageType === ProfilePackageType.Extension;
           const salePrice = sp?.salePrice || 0;
-          Object.assign(updated, applyRenewalAmountsForProfile(salePrice, !!ext, renewalAmountFullyReceived));
+          const discount = subscriptionDiscountForMethod(updated.activationPaymentMethod);
+          Object.assign(updated, applyRenewalAmountsForProfile(salePrice, !!ext, renewalAmountFullyReceived, discount));
+          if (sp?.packageType !== ProfilePackageType.Pin) {
+            updated.cardNumber = '';
+          }
           return updated;
         }
 
         if (name === 'amountPaid') {
           const salePrice = selectedProfile?.salePrice || 0;
-          const finalPrice = updated.overrideSalePrice || salePrice || 0;
+          const base = updated.overrideSalePrice || salePrice || 0;
+          const discount = Math.min(subscriptionDiscountForMethod(updated.activationPaymentMethod), base);
+          const finalPrice = Math.max(0, base - discount);
           const amountPaid = Number(newValue);
           const calculatedRemaining = Math.max(0, finalPrice - amountPaid);
 
@@ -2393,6 +2441,11 @@ const SubscribersPage: React.FC = () => {
     e.preventDefault();
     const selectedProfile = renewalInfo?.availableProfiles?.find(p => p.id === renewalData.newProfileId);
     const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+    const isPinPackage = selectedProfile?.packageType === ProfilePackageType.Pin;
+    if (isPinPackage && !(renewalData.cardNumber ?? '').trim()) {
+      showError('بيانات ناقصة', 'رقم البطاقة (PIN) مطلوب عند تفعيل باقة PIN.');
+      return;
+    }
     const isDeferred = renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
     const isCustomerWallet =
       (renewalData.activationChannel ?? RenewalActivationChannel.Normal) === RenewalActivationChannel.CustomerWallet;
@@ -2408,6 +2461,14 @@ const SubscribersPage: React.FC = () => {
     });
     const firstServiceFee = serviceFeesItems[0];
 
+    // خصم الاشتراك يُطبَّق نقداً/ماستر فقط. overrideSalePrice = السعر الأساسي (الباكند يخصم منه)،
+    // بينما المبلغ الواصل عند الدفع الكامل = السعر بعد الخصم.
+    const baseSalePrice = renewalData.overrideSalePrice || selectedProfile?.salePrice || 0;
+    const submitSubscriptionDiscount = !isExtension && !isDeferred && !isCustomerWallet
+      ? Math.min(subscriptionDiscountForMethod(renewalData.activationPaymentMethod), baseSalePrice)
+      : 0;
+    const netSalePrice = Math.max(0, baseSalePrice - submitSubscriptionDiscount);
+
     const enhancedRenewalData: RenewalData = {
       ...renewalData,
       notes: '',
@@ -2420,8 +2481,12 @@ const SubscribersPage: React.FC = () => {
             : renewalAmountFullyReceived
               ? PaymentStatus.Paid
               : renewalData.paymentStatus,
-      overrideSalePrice: isExtension ? 0 : renewalData.overrideSalePrice || selectedProfile?.salePrice || 0,
-      amountPaid: isExtension || isDeferred || isCustomerWallet ? 0 : renewalData.amountPaid,
+      overrideSalePrice: isExtension ? 0 : baseSalePrice,
+      amountPaid: isExtension || isDeferred || isCustomerWallet
+        ? 0
+        : renewalAmountFullyReceived
+          ? netSalePrice
+          : renewalData.amountPaid,
       remainingAmount: isExtension || isCustomerWallet ? 0 : renewalData.remainingAmount,
       debtDescription: isExtension || isCustomerWallet ? '' : renewalData.debtDescription,
       debtDueDate: isExtension || isCustomerWallet ? '' : renewalData.debtDueDate,
@@ -2445,6 +2510,7 @@ const SubscribersPage: React.FC = () => {
       newExpirationDate: ftthCompareSyncContext && ftthSyncPeriods.length === 1
         ? ftthSyncPeriods[0]?.newExpirationDate
         : renewalData.newExpirationDate,
+      cardNumber: isPinPackage ? (renewalData.cardNumber ?? '').trim() : undefined,
     };
 
     if (ftthCompareSyncContext && pendingFtthCompareRowIndex != null) {
@@ -4291,11 +4357,36 @@ const SubscribersPage: React.FC = () => {
                     <option value="">اختر الباقة</option>
                     {renewalInfo.availableProfiles?.map((profile) => (
                       <option key={profile.id} value={profile.id}>
-                        {profile.name} - {profile.packageType === ProfilePackageType.Extension ? 'تمديد مجاني' : profile.packageType === ProfilePackageType.SpecialOffer ? `${formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} — عرض خاص` : formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} ({profile.renewalPeriod || 30} يوم)
+                        {profile.name} - {profile.packageType === ProfilePackageType.Extension ? 'تمديد مجاني' : profile.packageType === ProfilePackageType.Pin ? `${formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} — PIN` : profile.packageType === ProfilePackageType.SpecialOffer ? `${formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} — عرض خاص` : formatNumber(profile.salePrice || 0, { suffix: ' د.ع' })} ({profile.renewalPeriod || 30} يوم)
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {(() => {
+                  const pinProfile = renewalInfo?.availableProfiles?.find(
+                    (p) => p.id === renewalData.newProfileId
+                  );
+                  if (pinProfile?.packageType !== ProfilePackageType.Pin) return null;
+                  return (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Card Number *
+                      </label>
+                      <input
+                        type="text"
+                        name="cardNumber"
+                        value={renewalData.cardNumber ?? ''}
+                        onChange={handleRenewalInputChange}
+                        required
+                        maxLength={100}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                        placeholder="أدخل رقم البطاقة (PIN)"
+                      />
+                      
+                    </div>
+                  );
+                })()}
 
                 {ftthCompareSyncContext && (
                   <div className="md:col-span-2 space-y-3">
@@ -4706,7 +4797,7 @@ const SubscribersPage: React.FC = () => {
                                   ...prev,
                                   activationChannel: RenewalActivationChannel.Normal,
                                   activationPaymentMethod: ActivationPaymentMethod.Cash,
-                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived, subscriptionDiscountForMethod(ActivationPaymentMethod.Cash)),
                                 }));
                               }}
                               className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
@@ -4726,7 +4817,7 @@ const SubscribersPage: React.FC = () => {
                                   ...prev,
                                   activationChannel: RenewalActivationChannel.Normal,
                                   activationPaymentMethod: ActivationPaymentMethod.Master,
-                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived),
+                                  ...applyRenewalAmountsForProfile(salePrice, false, renewalAmountFullyReceived, subscriptionDiscountForMethod(ActivationPaymentMethod.Master)),
                                 }));
                               }}
                               className={`rounded-xl border-2 px-3 py-4 text-sm font-semibold transition-all duration-200 ${
@@ -4894,6 +4985,52 @@ const SubscribersPage: React.FC = () => {
                 );
               })()}
 
+              {/* خصم الاشتراك — يظهر عند الدفع نقداً أو ماستر فقط */}
+              {(() => {
+                const selectedProfile = renewalInfo?.availableProfiles?.find(
+                  (p) => p.id === renewalData.newProfileId
+                );
+                const isExtension = selectedProfile?.packageType === ProfilePackageType.Extension;
+                const isCustomerWalletChannel =
+                  (renewalData.activationChannel ?? RenewalActivationChannel.Normal) ===
+                  RenewalActivationChannel.CustomerWallet;
+                const isDeferredPayment =
+                  renewalData.activationPaymentMethod === ActivationPaymentMethod.Deferred;
+                if (
+                  !renewalData.newProfileId ||
+                  isExtension ||
+                  isCustomerWalletChannel ||
+                  isDeferredPayment ||
+                  ftthMultiPeriodBilling ||
+                  renewalActiveSubscriptionDiscount <= 0
+                ) {
+                  return null;
+                }
+                const baseSale = renewalData.overrideSalePrice || selectedProfile?.salePrice || 0;
+                return (
+                  <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/80 dark:bg-green-950/30 px-4 py-3 space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">سعر الاشتراك الأصلي:</span>
+                      <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                        {formatNumber(baseSale, { suffix: ' د.ع' })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="text-green-700 dark:text-green-300">خصم الاشتراك:</span>
+                      <span className="font-medium tabular-nums text-green-700 dark:text-green-300">
+                        − {formatNumber(renewalActiveSubscriptionDiscount, { suffix: ' د.ع' })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-base font-bold pt-2 mt-1 border-t border-green-200/70 dark:border-green-800/70">
+                      <span className="text-gray-900 dark:text-white">السعر بعد الخصم:</span>
+                      <span className="text-green-700 dark:text-green-300 tabular-nums">
+                        {formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* أجور الخدمة */}
               {activationServiceFeesList.length > 0 && !ftthMultiPeriodBilling && (
                 <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/40 p-4 space-y-3">
@@ -5010,6 +5147,14 @@ const SubscribersPage: React.FC = () => {
                           {formatNumber(renewalSubscriptionPrice, { suffix: ' د.ع' })}
                         </span>
                       </div>
+                      {renewalActiveSubscriptionDiscount > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span className="text-green-700 dark:text-green-300">خصم الاشتراك:</span>
+                          <span className="font-medium tabular-nums text-green-700 dark:text-green-300">
+                            − {formatNumber(renewalActiveSubscriptionDiscount, { suffix: ' د.ع' })}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <span className="text-gray-600 dark:text-gray-400">مجموع أجور الخدمة:</span>
                         <span className="font-medium tabular-nums text-gray-900 dark:text-white">

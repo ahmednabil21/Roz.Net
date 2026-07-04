@@ -1123,6 +1123,28 @@ export interface ServiceFeesUpdateRequest {
   resellerIds?: string[];
 }
 
+/** خصومات الاشتراكات — GET/POST/PUT/DELETE /SubscriptionDiscounts */
+export interface SubscriptionDiscount {
+  id: string;
+  agentId: string;
+  name?: string | null;
+  amount: number;
+  resellerIds?: string[];
+}
+
+export interface SubscriptionDiscountCreateRequest {
+  name?: string | null;
+  amount: number;
+  agentId?: string;
+  resellerIds?: string[];
+}
+
+export interface SubscriptionDiscountUpdateRequest {
+  name?: string | null;
+  amount: number;
+  resellerIds?: string[];
+}
+
 /** رسيلر وكيل (SAS / FTTH / Earthlink) — من GET/POST/PUT /Agents/me/resellers */
 export interface AgentReseller {
   id: string;
@@ -1617,6 +1639,8 @@ export enum ProfilePackageType {
   Extension = 2,
   /** عرض خاص — أسعار + مواد اختيارية تُصرف عند التفعيل */
   SpecialOffer = 3,
+  /** باقة PIN — كود تفعيل؛ لا يُستقطَع رصيد من الرسيلر */
+  Pin = 4,
 }
 
 export enum ActivationType {
@@ -2150,6 +2174,8 @@ export interface RenewalReceipt {
   serviceFeesPrice?: number;
   serviceFeesAmountPaid?: number;
   serviceFeesRemainingAmount?: number;
+  /** مبلغ خصم الاشتراك المُطبَّق عند التفعيل (نقد/ماستر) */
+  subscriptionDiscountAmount?: number;
   /** اسم الموظف الذي نفّذ التفعيل */
   performedByFullName?: string | null;
   /** تاريخ طباعة/إصدار الفاتورة */
@@ -2461,6 +2487,8 @@ export interface RenewalData {
   renewalDate?: string;
   /** تاريخ انتهاء الاشتراك من المصدر الخارجي */
   newExpirationDate?: string;
+  /** رقم البطاقة (PIN) — مطلوب عند تفعيل باقة PIN */
+  cardNumber?: string;
 }
 
 export interface RenewalServiceFeeLineItem {

@@ -143,6 +143,9 @@ import {
   ServiceFees,
   ServiceFeesCreateRequest,
   ServiceFeesUpdateRequest,
+  SubscriptionDiscount,
+  SubscriptionDiscountCreateRequest,
+  SubscriptionDiscountUpdateRequest,
   ResellerWhatsAppSessionRequest,
   MainAgentDashboardDto,
   AgentRegistrationRequest,
@@ -208,6 +211,7 @@ function normalizeRenewalReceiptFromApi(raw: unknown): RenewalReceipt {
     serviceFeesPrice: num('serviceFeesPrice', 'ServiceFeesPrice'),
     serviceFeesAmountPaid: num('serviceFeesAmountPaid', 'ServiceFeesAmountPaid'),
     serviceFeesRemainingAmount: num('serviceFeesRemainingAmount', 'ServiceFeesRemainingAmount'),
+    subscriptionDiscountAmount: num('subscriptionDiscountAmount', 'SubscriptionDiscountAmount'),
     performedByFullName: (r.performedByFullName ?? r.PerformedByFullName ?? null) as string | null | undefined,
     receiptIssueDate: (r.receiptIssueDate ?? r.ReceiptIssueDate ?? r.issueDate ?? r.IssueDate ?? null) as
       | string
@@ -815,6 +819,36 @@ class ApiService {
 
   async deleteServiceFee(id: string): Promise<void> {
     await this.api.delete(`/ServiceFees/${id}`);
+  }
+
+  /** قائمة خصومات الاشتراكات — GET /SubscriptionDiscounts */
+  async getSubscriptionDiscounts(agentId?: string, resellerId?: string): Promise<SubscriptionDiscount[]> {
+    const params: Record<string, string> = {};
+    if (agentId) params.agentId = agentId;
+    if (resellerId) params.resellerId = resellerId;
+    const response = await this.api.get<SubscriptionDiscount[]>('/SubscriptionDiscounts', {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
+    return this.normalizeSubscriptionDiscountsList(response.data);
+  }
+
+  async getSubscriptionDiscount(id: string): Promise<SubscriptionDiscount> {
+    const response = await this.api.get<SubscriptionDiscount>(`/SubscriptionDiscounts/${id}`);
+    return response.data;
+  }
+
+  async createSubscriptionDiscount(data: SubscriptionDiscountCreateRequest): Promise<SubscriptionDiscount> {
+    const response = await this.api.post<SubscriptionDiscount>('/SubscriptionDiscounts', data);
+    return response.data;
+  }
+
+  async updateSubscriptionDiscount(id: string, data: SubscriptionDiscountUpdateRequest): Promise<SubscriptionDiscount> {
+    const response = await this.api.put<SubscriptionDiscount>(`/SubscriptionDiscounts/${id}`, data);
+    return response.data;
+  }
+
+  async deleteSubscriptionDiscount(id: string): Promise<void> {
+    await this.api.delete(`/SubscriptionDiscounts/${id}`);
   }
 
   /** قائمة رسيلرز وكيل معيّن — GET /Agents/{agentId}/resellers. استخدم "me" للوكيل الحالي. للأدمن: agentId الوكيل المختار. */
@@ -1687,6 +1721,25 @@ class ApiService {
       .filter((f) => f.id);
   }
 
+  private normalizeSubscriptionDiscountsList(raw: unknown): SubscriptionDiscount[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((f: any) => {
+        const resellerIdsRaw = f?.resellerIds ?? f?.ResellerIds;
+        const resellerIds = Array.isArray(resellerIdsRaw)
+          ? resellerIdsRaw.map((id: unknown) => String(id)).filter(Boolean)
+          : [];
+        return {
+          id: String(f?.id ?? f?.Id ?? ''),
+          agentId: String(f?.agentId ?? f?.AgentId ?? ''),
+          name: (f?.name ?? f?.Name ?? null) as string | null,
+          amount: Number(f?.amount ?? f?.Amount ?? 0) || 0,
+          resellerIds,
+        };
+      })
+      .filter((f) => f.id);
+  }
+
   private normalizeMaterial(m: any): Material {
     return {
       ...m,
@@ -2422,6 +2475,7 @@ class ApiService {
         debtDueDate: renewalData.debtDueDate ? `${renewalData.debtDueDate}T00:00:00` : null,
         notes: renewalData.notes || '',
         wiFiCode: renewalData.wifiCode || '',
+        cardNumber: renewalData.cardNumber?.trim() || null,
         wiFiQRCode: renewalData.wiFiQRCode || null,
         remainingAmount: renewalData.remainingAmount || 0,
         /** وصف الدين — الباكند يحفظه في description للدين ويرجعه في الاستجابة. المفتاح المطلوب: debtDescription */

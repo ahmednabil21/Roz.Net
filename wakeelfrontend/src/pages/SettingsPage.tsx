@@ -48,6 +48,9 @@ import {
   ServiceFees,
   ServiceFeesCreateRequest,
   ServiceFeesUpdateRequest,
+  SubscriptionDiscount,
+  SubscriptionDiscountCreateRequest,
+  SubscriptionDiscountUpdateRequest,
   FtthSubscribersExportBody,
   FtthSubscribersImportResponse,
   WhatsAppDeviceStatusAdmin,
@@ -83,6 +86,7 @@ import {
   DollarSign,
   Upload,
   Receipt,
+  BadgePercent,
 } from 'lucide-react';
 
 /** نقاط تُعرض أثناء استيراد المشتركين — ألوان ومزايا النظام */
@@ -148,6 +152,8 @@ function SettingsPage() {
   const canUpdateSubscriberPhones = isAdmin || isAgentOrSubAgent;
   const canManageServiceFees = isAdmin || isAgentOrSubAgent;
   const canViewServiceFees = canManageServiceFees || isEmployee;
+  const canManageSubscriptionDiscounts = isAdmin || isAgentOrSubAgent;
+  const canViewSubscriptionDiscounts = canManageSubscriptionDiscounts || isEmployee;
 
   // Admin SAS browser-sync state
   const [sasBrowserToken, setSasBrowserToken] = useState('');
@@ -483,6 +489,7 @@ function SettingsPage() {
     | 'customMessage'
     | 'resellers'
     | 'serviceFees'
+    | 'subscriptionDiscounts'
     | 'sas'
     | 'whatsapp'
     | 'sasAdminBrowserSync'
@@ -1386,6 +1393,137 @@ function SettingsPage() {
         price,
         agentId: isAdmin ? serviceFeesAgentId.trim() : undefined,
         resellerIds: serviceFeeResellerIds,
+      });
+    }
+  };
+
+  // ===== خصومات الاشتراكات =====
+  const [subDiscountAgentId, setSubDiscountAgentId] = useState('');
+  const [subDiscountFormId, setSubDiscountFormId] = useState<string | null>(null);
+  const [showSubDiscountForm, setShowSubDiscountForm] = useState(false);
+  const [subDiscountName, setSubDiscountName] = useState('');
+  const [subDiscountAmount, setSubDiscountAmount] = useState('');
+  const [subDiscountResellerIds, setSubDiscountResellerIds] = useState<string[]>([]);
+
+  const { data: subDiscountAgentsData } = useQuery({
+    queryKey: ['agents-list-sub-discounts'],
+    queryFn: () => apiService.getAllAgents({ page: 1, pageSize: 500 }),
+    enabled: isAdmin && activeSection === 'subscriptionDiscounts',
+  });
+  const subDiscountAgents = subDiscountAgentsData?.data ?? [];
+
+  const { data: subDiscountsList = [], isLoading: subDiscountsLoading } = useQuery<SubscriptionDiscount[]>({
+    queryKey: ['subscriptionDiscounts', isAdmin ? subDiscountAgentId : 'me'],
+    queryFn: () => apiService.getSubscriptionDiscounts(isAdmin ? subDiscountAgentId || undefined : undefined),
+    enabled:
+      canViewSubscriptionDiscounts &&
+      activeSection === 'subscriptionDiscounts' &&
+      (!isAdmin || !!subDiscountAgentId),
+  });
+
+  const { data: subDiscountResellers = [] } = useQuery<AgentReseller[]>({
+    queryKey: ['subscriptionDiscountResellers', isAdmin ? subDiscountAgentId : 'me'],
+    queryFn: () =>
+      isAdmin
+        ? apiService.getAgentResellers(subDiscountAgentId)
+        : apiService.getMyResellers(),
+    enabled:
+      canViewSubscriptionDiscounts &&
+      activeSection === 'subscriptionDiscounts' &&
+      (!isAdmin || !!subDiscountAgentId),
+  });
+
+  const resetSubDiscountForm = () => {
+    setSubDiscountFormId(null);
+    setShowSubDiscountForm(false);
+    setSubDiscountName('');
+    setSubDiscountAmount('');
+    setSubDiscountResellerIds([]);
+  };
+
+  const createSubDiscountMutation = useMutation({
+    mutationFn: (data: SubscriptionDiscountCreateRequest) => apiService.createSubscriptionDiscount(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptionDiscounts'] });
+      showSuccess('تم الحفظ', 'تمت إضافة خصم الاشتراك بنجاح.');
+      resetSubDiscountForm();
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+
+  const updateSubDiscountMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SubscriptionDiscountUpdateRequest }) =>
+      apiService.updateSubscriptionDiscount(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptionDiscounts'] });
+      showSuccess('تم الحفظ', 'تم تحديث خصم الاشتراك بنجاح.');
+      resetSubDiscountForm();
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+
+  const deleteSubDiscountMutation = useMutation({
+    mutationFn: (id: string) => apiService.deleteSubscriptionDiscount(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptionDiscounts'] });
+      showSuccess('تم الحذف', 'تم حذف خصم الاشتراك بنجاح.');
+      if (subDiscountFormId) setSubDiscountFormId(null);
+    },
+    onError: (err: any) => showError('خطأ', ApiService.showError(err)),
+  });
+
+  const handleOpenSubDiscountEdit = (discount: SubscriptionDiscount) => {
+    setSubDiscountFormId(discount.id);
+    setShowSubDiscountForm(true);
+    setSubDiscountName(discount.name ?? '');
+    setSubDiscountAmount(String(discount.amount));
+    setSubDiscountResellerIds(discount.resellerIds ?? []);
+  };
+
+  const toggleSubDiscountReseller = (resellerId: string) => {
+    setSubDiscountResellerIds((prev) =>
+      prev.includes(resellerId) ? prev.filter((id) => id !== resellerId) : [...prev, resellerId],
+    );
+  };
+
+  const subDiscountResellerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of subDiscountResellers) {
+      map.set(r.id, r.regionName ? `${r.name} (${r.regionName})` : r.name);
+    }
+    return map;
+  }, [subDiscountResellers]);
+
+  const formatSubDiscountResellers = (discount: SubscriptionDiscount) => {
+    const ids = discount.resellerIds ?? [];
+    if (ids.length === 0) return '— لا يُطبَّق على أي رسيلر —';
+    return ids
+      .map((id) => subDiscountResellerNameById.get(id) ?? id.slice(0, 8))
+      .join('، ');
+  };
+
+  const handleSaveSubDiscount = () => {
+    const amount = Number(subDiscountAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      showError('خطأ', 'أدخل مبلغ خصم صحيحاً (0 أو أكثر).');
+      return;
+    }
+    const trimmedName = subDiscountName.trim();
+    if (subDiscountFormId) {
+      updateSubDiscountMutation.mutate({
+        id: subDiscountFormId,
+        data: { name: trimmedName || null, amount, resellerIds: subDiscountResellerIds },
+      });
+    } else {
+      if (isAdmin && !subDiscountAgentId.trim()) {
+        showError('خطأ', 'اختر الوكيل أولاً.');
+        return;
+      }
+      createSubDiscountMutation.mutate({
+        name: trimmedName || null,
+        amount,
+        agentId: isAdmin ? subDiscountAgentId.trim() : undefined,
+        resellerIds: subDiscountResellerIds,
       });
     }
   };
@@ -3558,6 +3696,206 @@ function SettingsPage() {
             </div>
           )}
 
+          {canViewSubscriptionDiscounts && activeSection === 'subscriptionDiscounts' && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex items-center space-x-3">
+                  <BadgePercent className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">خصومات الاشتراكات</h2>
+                </div>
+                {canManageSubscriptionDiscounts && (!isAdmin || !!subDiscountAgentId) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubDiscountFormId(null);
+                      setShowSubDiscountForm(true);
+                      setSubDiscountName('');
+                      setSubDiscountAmount('');
+                      setSubDiscountResellerIds([]);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    إضافة خصم
+                  </button>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                أدخل مبلغ الخصم وحدّد الرسيلرز الذين يُطبَّق عليهم. يظهر الخصم ويُخصم من سعر الاشتراك عند التفعيل نقداً أو ماستر فقط؛ أما الدفع الآجل فيُباع الاشتراك بسعره الأصلي دون خصم.
+              </p>
+
+              {isAdmin && (
+                <div className="mb-4 max-w-md">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الوكيل *</label>
+                  <select
+                    value={subDiscountAgentId}
+                    onChange={(e) => {
+                      setSubDiscountAgentId(e.target.value);
+                      setSubDiscountFormId(null);
+                      setShowSubDiscountForm(false);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                  >
+                    <option value="">— اختر الوكيل —</option>
+                    {subDiscountAgents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.companyName || agent.fullName || agent.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isAdmin && !subDiscountAgentId ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">اختر وكيلاً لعرض وإدارة خصومات الاشتراكات.</p>
+              ) : subDiscountsLoading ? (
+                <div className="py-4 text-gray-500 dark:text-gray-400">جاري تحميل خصومات الاشتراكات...</div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="wakeel-table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>الاسم</th>
+                          <th>مبلغ الخصم</th>
+                          <th>الرسيلرز</th>
+                          {canManageSubscriptionDiscounts && <th className="w-28">إجراءات</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subDiscountsList.map((discount) => (
+                          <tr key={discount.id}>
+                            <td className="font-medium text-gray-900 dark:text-white">{discount.name || '—'}</td>
+                            <td className="tabular-nums">{formatNumber(discount.amount, { suffix: ' د.ع' })}</td>
+                            <td className="text-sm text-gray-600 dark:text-gray-300 max-w-xs">
+                              {formatSubDiscountResellers(discount)}
+                            </td>
+                            {canManageSubscriptionDiscounts && (
+                              <td>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenSubDiscountEdit(discount)}
+                                    className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                                    title="تعديل"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => window.confirm('حذف هذا الخصم؟') && deleteSubDiscountMutation.mutate(discount.id)}
+                                    className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                    title="حذف"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {subDiscountsList.length === 0 && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {canManageSubscriptionDiscounts ? 'لم تُضف أي خصم بعد. اضغط «إضافة خصم».' : 'لا توجد خصومات مسجّلة.'}
+                    </p>
+                  )}
+
+                  {canManageSubscriptionDiscounts && showSubDiscountForm && (
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        {subDiscountFormId ? 'تعديل الخصم' : 'إضافة خصم'}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">الاسم (اختياري)</label>
+                          <input
+                            type="text"
+                            value={subDiscountName}
+                            onChange={(e) => setSubDiscountName(e.target.value)}
+                            placeholder="مثل: خصم الصيف"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">مبلغ الخصم (د.ع) *</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={subDiscountAmount}
+                            onChange={(e) => setSubDiscountAmount(e.target.value)}
+                            placeholder="0"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                          الرسيلرز المطبَّق عليهم الخصم *
+                        </label>
+                        {subDiscountResellers.length === 0 ? (
+                          <p className="text-xs text-amber-700 dark:text-amber-300">
+                            لا توجد رسيلرز. أضف رسيلرز من قسم المناطق والرسيلرز أولاً.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border border-gray-200 dark:border-gray-600 rounded-md">
+                            {subDiscountResellers.map((reseller) => {
+                              const checked = subDiscountResellerIds.includes(reseller.id);
+                              return (
+                                <label
+                                  key={reseller.id}
+                                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm cursor-pointer border ${
+                                    checked
+                                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-200'
+                                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleSubDiscountReseller(reseller.id)}
+                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <span>
+                                    {reseller.name}
+                                    {reseller.regionName ? ` (${reseller.regionName})` : ''}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          بدون تحديد رسيلر لن يُطبَّق الخصم على أي تفعيل.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={handleSaveSubDiscount}
+                          disabled={createSubDiscountMutation.isPending || updateSubDiscountMutation.isPending}
+                          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm disabled:opacity-50"
+                        >
+                          {subDiscountFormId ? 'حفظ التعديل' : 'إضافة'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetSubDiscountForm}
+                          className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white rounded-lg text-sm"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ربط جلسة واتساب — جلسة واحدة للوكيل لجميع الرسيلرز والمناطق */}
           {isAgentOrSubAgentOrEmployee && activeSection === 'whatsapp' && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -4027,6 +4365,18 @@ function SettingsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveSection('subscriptionDiscounts')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'subscriptionDiscounts'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <BadgePercent className="h-5 w-5 flex-shrink-0" />
+                    <span>خصومات الاشتراكات</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setActiveSection('whatsapp')}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
                       activeSection === 'whatsapp'
@@ -4055,6 +4405,18 @@ function SettingsPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setActiveSection('subscriptionDiscounts')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'subscriptionDiscounts'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <BadgePercent className="h-5 w-5 flex-shrink-0" />
+                    <span>خصومات الاشتراكات</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setActiveSection('whatsapp')}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
                       activeSection === 'whatsapp'
@@ -4068,18 +4430,32 @@ function SettingsPage() {
                 </>
               )}
               {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => setActiveSection('serviceFees')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
-                    activeSection === 'serviceFees'
-                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <DollarSign className="h-5 w-5 flex-shrink-0" />
-                  <span>أجور الخدمة</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection('serviceFees')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'serviceFees'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <DollarSign className="h-5 w-5 flex-shrink-0" />
+                    <span>أجور الخدمة</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection('subscriptionDiscounts')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-right rounded-lg transition-colors ${
+                      activeSection === 'subscriptionDiscounts'
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <BadgePercent className="h-5 w-5 flex-shrink-0" />
+                    <span>خصومات الاشتراكات</span>
+                  </button>
+                </>
               )}
             </nav>
           </div>
