@@ -2502,6 +2502,7 @@ class ApiService {
         activationPaymentMethod:
           renewalData.activationPaymentMethod ?? ActivationPaymentMethod.Cash,
         activationChannel: renewalData.activationChannel ?? RenewalActivationChannel.Normal,
+        subscriptionDiscountAmount: renewalData.subscriptionDiscountAmount ?? null,
         renewalDate: renewalData.renewalDate ? `${renewalData.renewalDate}T00:00:00` : null,
         newExpirationDate: renewalData.newExpirationDate ? `${renewalData.newExpirationDate}T00:00:00` : null,
       };

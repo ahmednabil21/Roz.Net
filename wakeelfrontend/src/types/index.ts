@@ -2489,6 +2489,8 @@ export interface RenewalData {
   newExpirationDate?: string;
   /** رقم البطاقة (PIN) — مطلوب عند تفعيل باقة PIN */
   cardNumber?: string;
+  /** مبلغ خصم الاشتراك المُطبَّق عند التفعيل (يُرسل عند تفعيل الخصم في المودال) */
+  subscriptionDiscountAmount?: number;
 }
 
 export interface RenewalServiceFeeLineItem {
