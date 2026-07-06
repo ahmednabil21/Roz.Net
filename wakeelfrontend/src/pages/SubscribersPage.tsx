@@ -860,6 +860,48 @@ const SubscribersPage: React.FC = () => {
     ],
   );
 
+  const applyRenewalAmountsForProfile = React.useCallback(
+    (
+      salePrice: number,
+      isExtension: boolean,
+      fullyReceived: boolean,
+      subscriptionDiscount: number = 0
+    ) => {
+      if (isExtension) {
+        return {
+          overrideSalePrice: 0,
+          amountPaid: 0,
+          remainingAmount: 0,
+          debtDescription: '',
+          debtDueDate: '',
+          paymentStatus: PaymentStatus.Paid,
+        };
+      }
+      const effectiveDiscount = Math.min(Math.max(0, subscriptionDiscount), salePrice);
+      const netPrice = Math.max(0, salePrice - effectiveDiscount);
+      if (fullyReceived) {
+        return {
+          overrideSalePrice: salePrice,
+          amountPaid: netPrice,
+          remainingAmount: 0,
+          debtDescription: '',
+          debtDueDate: '',
+          paymentStatus: PaymentStatus.Paid,
+        };
+      }
+      const remaining = netPrice;
+      return {
+        overrideSalePrice: salePrice,
+        amountPaid: 0,
+        remainingAmount: remaining,
+        debtDescription: remaining > 0 ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}` : '',
+        debtDueDate: '',
+        paymentStatus: PaymentStatus.Unpaid,
+      };
+    },
+    [formatNumber],
+  );
+
   const isActivationServiceFeeFullyPaid = React.useCallback(
     (feeId: string) => activationServiceFeesFullyPaid[feeId] !== false,
     [activationServiceFeesFullyPaid]
@@ -1161,8 +1203,6 @@ const SubscribersPage: React.FC = () => {
     renewalInfo,
     renewalData.newProfileId,
     renewalData.overrideSalePrice,
-    renewalData.activationPaymentMethod,
-    renewalData.activationChannel,
     getEffectiveSubscriptionDiscount,
   ]);
 
@@ -1175,8 +1215,6 @@ const SubscribersPage: React.FC = () => {
     renewalInfo,
     renewalData.newProfileId,
     renewalData.overrideSalePrice,
-    renewalData.activationPaymentMethod,
-    renewalData.activationChannel,
     getEffectiveSubscriptionDiscount,
   ]);
 
@@ -1277,6 +1315,7 @@ const SubscribersPage: React.FC = () => {
     renewalData.newProfileId,
     renewalInfo?.availableProfiles,
     renewalAmountFullyReceived,
+    applyRenewalAmountsForProfile,
   ]);
 
   useEffect(() => {
@@ -2269,46 +2308,6 @@ const SubscribersPage: React.FC = () => {
         [name]: value,
       } as any;
     });
-  };
-
-  const applyRenewalAmountsForProfile = (
-    salePrice: number,
-    isExtension: boolean,
-    fullyReceived: boolean,
-    subscriptionDiscount: number = 0
-  ) => {
-    if (isExtension) {
-      return {
-        overrideSalePrice: 0,
-        amountPaid: 0,
-        remainingAmount: 0,
-        debtDescription: '',
-        debtDueDate: '',
-        paymentStatus: PaymentStatus.Paid,
-      };
-    }
-    // overrideSalePrice يبقى السعر الأساسي للباقة؛ الباكند يخصم مبلغ خصم الاشتراك عند تفعيل الخصم في المودال.
-    const effectiveDiscount = Math.min(Math.max(0, subscriptionDiscount), salePrice);
-    const netPrice = Math.max(0, salePrice - effectiveDiscount);
-    if (fullyReceived) {
-      return {
-        overrideSalePrice: salePrice,
-        amountPaid: netPrice,
-        remainingAmount: 0,
-        debtDescription: '',
-        debtDueDate: '',
-        paymentStatus: PaymentStatus.Paid,
-      };
-    }
-    const remaining = netPrice;
-    return {
-      overrideSalePrice: salePrice,
-      amountPaid: 0,
-      remainingAmount: remaining,
-      debtDescription: remaining > 0 ? `الباقي من المبلغ: ${formatNumber(remaining, { suffix: ' د.ع' })}` : '',
-      debtDueDate: '',
-      paymentStatus: PaymentStatus.Unpaid,
-    };
   };
 
   const buildFtthPeriodRenewalPayload = (
@@ -4393,6 +4392,7 @@ const SubscribersPage: React.FC = () => {
                   />
                 </div>
               </div>
+              
 
               {/* Form Actions */}
               <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
