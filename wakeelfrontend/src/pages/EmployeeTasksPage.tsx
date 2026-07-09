@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
-import { employeeCanReceiveTaskRequests, employeeCanManageEmployeeTasks, employeeCanAccessEmployeeTasks } from '../utils/employeePermissions';
+import { employeeCanManageEmployeeTasks, employeeCanAccessEmployeeTasks } from '../utils/employeePermissions';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
 import {
@@ -82,12 +82,13 @@ const EmployeeTasksPage: React.FC = () => {
   const { formatNumber } = useDigits();
   const queryClient = useQueryClient();
   const isEmployee = user?.role === UserRole.Employee;
-  const canManage =
+  const canAssignAndManageTasks =
     user?.role === UserRole.Admin ||
     user?.role === UserRole.Agent ||
-    user?.role === UserRole.SubAgent ||
-    employeeCanManageEmployeeTasks(user);
-  const showTasksTable = !isEmployee || canManage;
+    user?.role === UserRole.SubAgent;
+  const canManage = canAssignAndManageTasks;
+  const employeeHasManageTasksPermission = employeeCanManageEmployeeTasks(user);
+  const showTasksTable = !isEmployee || employeeHasManageTasksPermission;
   const isAdmin = user?.role === UserRole.Admin;
 
   const [page, setPage] = useState(1);
@@ -244,8 +245,7 @@ const EmployeeTasksPage: React.FC = () => {
 
   const employeesOptions = isAdmin ? adminEmployees : myEmployees;
 
-  const useMyTasksEndpoint =
-    isEmployee && !canManage && employeeCanReceiveTaskRequests(user);
+  const useMyTasksEndpoint = isEmployee;
 
   const { data: tasksResponse, isLoading, refetch } = useQuery({
     queryKey: ['employee-tasks', useMyTasksEndpoint ? 'my' : 'agent', taskQueryParams],
@@ -255,14 +255,14 @@ const EmployeeTasksPage: React.FC = () => {
         : apiService.getAgentEmployeeTasks(taskQueryParams),
     enabled:
       !!user &&
-      (canManage || (isEmployee && employeeCanReceiveTaskRequests(user))) &&
+      (canAssignAndManageTasks || (isEmployee && employeeCanAccessEmployeeTasks(user))) &&
       (!isAdmin || !!taskQueryParams.agentId),
   });
 
   // SignalR: إشعارات المهام الجديدة للموظف المنفّذ
   useEffect(() => {
     if (!isEmployee) return;
-    if (!employeeCanReceiveTaskRequests(user)) return;
+    if (!employeeCanAccessEmployeeTasks(user)) return;
 
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -453,7 +453,7 @@ const EmployeeTasksPage: React.FC = () => {
 
   useEffect(() => {
     if (!isEmployee) return;
-    if (!employeeCanReceiveTaskRequests(user)) return;
+    if (!employeeCanAccessEmployeeTasks(user)) return;
     setPushReady(typeof Notification !== 'undefined' && Notification.permission === 'granted');
   }, [isEmployee, user]);
 
@@ -684,7 +684,7 @@ const EmployeeTasksPage: React.FC = () => {
                 : 'إدارة مهام الموظفين'}
           </p>
         </div>
-        {isEmployee && employeeCanReceiveTaskRequests(user) && (
+        {isEmployee && employeeCanAccessEmployeeTasks(user) && (
           <button
             type="button"
             onClick={async () => {
@@ -986,7 +986,7 @@ const EmployeeTasksPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {canManage && (
+                          {canAssignAndManageTasks && (
                             <>
                               <button
                                 type="button"
@@ -1051,7 +1051,7 @@ const EmployeeTasksPage: React.FC = () => {
                             </>
                           )}
 
-                          {isEmployee && !canManage && employeeCanReceiveTaskRequests(user) && (
+                          {isEmployee && (
                             <>
                               {task.status === EmployeeTaskStatus.Pending && (
                                 <>
