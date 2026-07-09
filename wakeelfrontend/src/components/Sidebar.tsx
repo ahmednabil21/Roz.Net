@@ -313,6 +313,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     if (user?.role === UserRole.Employee && item.path === '/admin/employees') {
       const hasTasks = employeeCanAccessEmployeeTasks(user);
       const hasExpense = employeeCanAccessExpenseFeatures(user);
+      const hasEmployeesView =
+        !usesPagePermissions(user) || canAccessAdminPath('/admin/employees');
+      if (hasTasks && !hasExpense && !hasEmployeesView) {
+        return {
+          ...item,
+          name: 'مهام الموظفين',
+          path: '/admin/employees/tasks',
+          children: undefined,
+        };
+      }
       if (hasTasks && !hasExpense) {
         return {
           ...item,
@@ -326,6 +336,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
           if (c.path === '/admin/employees') return false;
           if (c.path === '/admin/employees/tasks' && !hasTasks) return false;
           if (c.path === '/admin/expenses/salary-sheet' && !hasExpense) return false;
+          if (
+            user?.role === UserRole.Employee &&
+            usesPagePermissions(user) &&
+            c.path !== '/admin/employees/tasks' &&
+            !canAccessAdminPath(c.path)
+          ) {
+            return false;
+          }
           return true;
         });
         if (children.length === 1) {
@@ -514,6 +532,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
                   </button>
                   {isExpanded && item.children!
                     .filter((child) => {
+                      if (
+                        child.path === '/admin/employees/tasks' &&
+                        user?.role === UserRole.Employee &&
+                        !employeeCanAccessEmployeeTasks(user)
+                      ) {
+                        return false;
+                      }
                       if (user?.role === UserRole.Employee && usesPagePermissions(user) && !canAccessAdminPath(child.path)) {
                         return false;
                       }

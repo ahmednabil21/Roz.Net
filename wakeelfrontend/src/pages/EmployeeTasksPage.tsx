@@ -82,13 +82,12 @@ const EmployeeTasksPage: React.FC = () => {
   const { formatNumber } = useDigits();
   const queryClient = useQueryClient();
   const isEmployee = user?.role === UserRole.Employee;
-  const canAssignAndManageTasks =
+  const canManage =
     user?.role === UserRole.Admin ||
     user?.role === UserRole.Agent ||
-    user?.role === UserRole.SubAgent;
-  const canManage = canAssignAndManageTasks;
-  const employeeHasManageTasksPermission = employeeCanManageEmployeeTasks(user);
-  const showTasksTable = !isEmployee || employeeHasManageTasksPermission;
+    user?.role === UserRole.SubAgent ||
+    employeeCanManageEmployeeTasks(user);
+  const showTasksTable = !isEmployee || canManage;
   const isAdmin = user?.role === UserRole.Admin;
 
   const [page, setPage] = useState(1);
@@ -245,7 +244,8 @@ const EmployeeTasksPage: React.FC = () => {
 
   const employeesOptions = isAdmin ? adminEmployees : myEmployees;
 
-  const useMyTasksEndpoint = isEmployee;
+  const useMyTasksEndpoint =
+    isEmployee && !canManage && employeeCanReceiveTaskRequests(user);
 
   const { data: tasksResponse, isLoading, refetch } = useQuery({
     queryKey: ['employee-tasks', useMyTasksEndpoint ? 'my' : 'agent', taskQueryParams],
@@ -255,14 +255,14 @@ const EmployeeTasksPage: React.FC = () => {
         : apiService.getAgentEmployeeTasks(taskQueryParams),
     enabled:
       !!user &&
-      (canAssignAndManageTasks || (isEmployee && employeeCanAccessEmployeeTasks(user))) &&
+      (canManage || (isEmployee && employeeCanReceiveTaskRequests(user))) &&
       (!isAdmin || !!taskQueryParams.agentId),
   });
 
-  // SignalR: إشعارات المهام الجديدة للموظف
+  // SignalR: إشعارات المهام الجديدة للموظف المنفّذ
   useEffect(() => {
     if (!isEmployee) return;
-    if (!employeeCanAccessEmployeeTasks(user)) return;
+    if (!employeeCanReceiveTaskRequests(user)) return;
 
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -677,10 +677,14 @@ const EmployeeTasksPage: React.FC = () => {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">مهام الموظفين</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {isEmployee ? 'مهامي الشخصية' : 'إدارة مهام الموظفين'}
+            {isEmployee && canManage
+              ? 'إدارة مهام الموظفين'
+              : isEmployee
+                ? 'مهامي الشخصية'
+                : 'إدارة مهام الموظفين'}
           </p>
         </div>
-        {isEmployee && employeeCanAccessEmployeeTasks(user) && (
+        {isEmployee && employeeCanReceiveTaskRequests(user) && (
           <button
             type="button"
             onClick={async () => {
@@ -982,7 +986,7 @@ const EmployeeTasksPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {canAssignAndManageTasks && (
+                          {canManage && (
                             <>
                               <button
                                 type="button"
@@ -1047,7 +1051,7 @@ const EmployeeTasksPage: React.FC = () => {
                             </>
                           )}
 
-                          {isEmployee && (
+                          {isEmployee && !canManage && employeeCanReceiveTaskRequests(user) && (
                             <>
                               {task.status === EmployeeTaskStatus.Pending && (
                                 <>

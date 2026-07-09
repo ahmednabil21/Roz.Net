@@ -251,6 +251,10 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
 export function employeeCanAccessAdminPath(user: User | null | undefined, path: string): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
 
+  if (path === '/admin/employees/tasks' || path.startsWith('/admin/employees/tasks/')) {
+    return employeeCanAccessEmployeeTasks(user);
+  }
+
   const rule = ADMIN_ROUTE_PERMISSIONS.find(
     (r) => path === r.pathPrefix || path.startsWith(`${r.pathPrefix}/`)
   );
@@ -288,7 +292,7 @@ export function employeeCanAccessDashboard(user: User | null | undefined): boole
 export function employeeCanAccessEmployeeTasks(user: User | null | undefined): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
   if (usesPagePermissions(user)) {
-    return hasAnyPageAction(user, 'EmployeeManagement');
+    return employeeCanManageEmployeeTasks(user) || employeeCanReceiveTaskRequests(user);
   }
   return !!(user.canReceiveTaskRequests || user.canManageEmployeeTasks);
 }
