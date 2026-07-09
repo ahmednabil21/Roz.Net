@@ -322,8 +322,10 @@ export function employeeCanReceiveTaskRequests(user: User | null | undefined): b
 export function employeeCanManageEmployeeTasks(user: User | null | undefined): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
   if (usesPagePermissions(user)) {
-    return ['manageEmployeeTasks', 'addTask', 'editTask', 'deleteTask'].some((a) =>
-      hasPageAction(user, 'EmployeeManagement', a)
+    return (
+      ['manageEmployeeTasks', 'addTask', 'editTask', 'deleteTask'].some((a) =>
+        hasPageAction(user, 'EmployeeManagement', a)
+      ) || !!user.canManageEmployeeTasks
     );
   }
   return !!user.canManageEmployeeTasks;

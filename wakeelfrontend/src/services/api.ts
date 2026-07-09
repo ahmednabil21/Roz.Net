@@ -657,16 +657,32 @@ class ApiService {
   }
 
   private normalizeUserPagePermissions(user: User): User {
-    const raw = user as User & { PagePermissions?: EmployeePagePermissionSet[] };
-    const sets = user.pagePermissions ?? raw.PagePermissions;
-    if (!sets?.length) return user;
-    return {
-      ...user,
-      pagePermissions: sets.map((s) => ({
-        page: s.page,
-        actions: s.actions ?? [],
-      })),
+    const raw = user as User & {
+      PagePermissions?: Array<Record<string, unknown>>;
+      CanManageEmployeeTasks?: boolean;
+      canManageEmployeeTasks?: boolean;
     };
+    const setsRaw = user.pagePermissions ?? raw.PagePermissions;
+    const next: User = { ...user };
+
+    if (raw.canManageEmployeeTasks != null || raw.CanManageEmployeeTasks != null) {
+      next.canManageEmployeeTasks = !!(raw.canManageEmployeeTasks ?? raw.CanManageEmployeeTasks);
+    }
+
+    if (!setsRaw?.length) return next;
+
+    const sets = setsRaw as Array<Record<string, unknown> | EmployeePagePermissionSet>;
+    next.pagePermissions = sets
+      .map((s) => {
+        const row = s as Record<string, unknown>;
+        const page = String(row.page ?? row.Page ?? '');
+        const actionsRaw = (row.actions ?? row.Actions ?? []) as unknown[];
+        const actions = actionsRaw.map(String).filter(Boolean);
+        return { page, actions };
+      })
+      .filter((s) => s.page && s.actions.length > 0);
+
+    return next;
   }
 
   /** فحص خفيف للاتصال بالسيرفر (للوضع دون اتصال) — GET /wakeel/health بدون استدعاء /users/me */

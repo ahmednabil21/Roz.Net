@@ -109,6 +109,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response.pagePermissions?.length) {
         userData = { ...userData, pagePermissions: response.pagePermissions };
+      } else if (userData.pagePermissions?.length) {
+        userData = { ...userData, pagePermissions: userData.pagePermissions };
       }
 
       setUser(userData);
