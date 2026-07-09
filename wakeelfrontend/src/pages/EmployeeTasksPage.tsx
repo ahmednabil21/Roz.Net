@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
-import { employeeCanReceiveTaskRequests, employeeCanManageEmployeeTasks } from '../utils/employeePermissions';
+import { employeeCanReceiveTaskRequests, employeeCanManageEmployeeTasks, employeeCanAccessEmployeeTasks } from '../utils/employeePermissions';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
 import {
@@ -82,11 +82,13 @@ const EmployeeTasksPage: React.FC = () => {
   const { formatNumber } = useDigits();
   const queryClient = useQueryClient();
   const isEmployee = user?.role === UserRole.Employee;
-  const canManage =
+  const canAssignAndManageTasks =
     user?.role === UserRole.Admin ||
     user?.role === UserRole.Agent ||
-    user?.role === UserRole.SubAgent ||
-    employeeCanManageEmployeeTasks(user);
+    user?.role === UserRole.SubAgent;
+  const canManage = canAssignAndManageTasks;
+  const employeeHasManageTasksPermission = employeeCanManageEmployeeTasks(user);
+  const showTasksTable = !isEmployee || employeeHasManageTasksPermission;
   const isAdmin = user?.role === UserRole.Admin;
 
   const [page, setPage] = useState(1);
@@ -243,8 +245,7 @@ const EmployeeTasksPage: React.FC = () => {
 
   const employeesOptions = isAdmin ? adminEmployees : myEmployees;
 
-  const useMyTasksEndpoint =
-    isEmployee && !canManage && employeeCanReceiveTaskRequests(user);
+  const useMyTasksEndpoint = isEmployee;
 
   const { data: tasksResponse, isLoading, refetch } = useQuery({
     queryKey: ['employee-tasks', useMyTasksEndpoint ? 'my' : 'agent', taskQueryParams],
@@ -254,14 +255,14 @@ const EmployeeTasksPage: React.FC = () => {
         : apiService.getAgentEmployeeTasks(taskQueryParams),
     enabled:
       !!user &&
-      (canManage || (isEmployee && employeeCanReceiveTaskRequests(user))) &&
+      (canAssignAndManageTasks || (isEmployee && employeeCanAccessEmployeeTasks(user))) &&
       (!isAdmin || !!taskQueryParams.agentId),
   });
 
-  // SignalR: إشعارات المهام الجديدة للموظف فقط
+  // SignalR: إشعارات المهام الجديدة للموظف
   useEffect(() => {
     if (!isEmployee) return;
-    if (!employeeCanReceiveTaskRequests(user)) return;
+    if (!employeeCanAccessEmployeeTasks(user)) return;
 
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -679,7 +680,7 @@ const EmployeeTasksPage: React.FC = () => {
             {isEmployee ? 'مهامي الشخصية' : 'إدارة مهام الموظفين'}
           </p>
         </div>
-        {isEmployee && employeeCanReceiveTaskRequests(user) && (
+        {isEmployee && employeeCanAccessEmployeeTasks(user) && (
           <button
             type="button"
             onClick={async () => {
@@ -783,7 +784,7 @@ const EmployeeTasksPage: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {isEmployee ? (
+        {!showTasksTable ? (
           <div className="p-4 space-y-3">
             {isLoading ? (
               <div className="px-3 py-6 text-center text-gray-500 dark:text-gray-400">
@@ -981,7 +982,7 @@ const EmployeeTasksPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {canManage && (
+                          {canAssignAndManageTasks && (
                             <>
                               <button
                                 type="button"
@@ -1043,6 +1044,85 @@ const EmployeeTasksPage: React.FC = () => {
                                 <Trash2 className="h-3.5 w-3.5" />
                                 حذف
                               </button>
+                            </>
+                          )}
+
+                          {isEmployee && (
+                            <>
+                              {task.status === EmployeeTaskStatus.Pending && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => acceptMutation.mutate(task.id)}
+                                    className="px-2.5 py-1.5 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white"
+                                  >
+                                    قبول
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setShowDetailsModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 text-xs rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200"
+                                  >
+                                    التفاصيل
+                                  </button>
+                                </>
+                              )}
+
+                              {task.status === EmployeeTaskStatus.Accepted &&
+                                task.taskType === EmployeeTaskType.SubscriberInstallation && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setCompleteForm({
+                                        subscriberName: task.subscriberName || '',
+                                        subscriberPhone: task.subscriberPhone || '',
+                                        signalNumber: task.signalNumber || '',
+                                        note: task.note || '',
+                                      });
+                                      setShowCompleteModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 text-xs rounded-md bg-green-600 hover:bg-green-700 text-white"
+                                  >
+                                    إكمال التنصيب
+                                  </button>
+                                )}
+
+                              {task.status === EmployeeTaskStatus.Accepted &&
+                                task.taskType === EmployeeTaskType.SubscriberMaintenance && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setCompleteMaintenanceForm({ note: task.note || '' });
+                                      setShowCompleteModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 text-xs rounded-md bg-green-700 hover:bg-green-800 text-white"
+                                  >
+                                    إكمال الصيانة
+                                  </button>
+                                )}
+
+                              {task.status === EmployeeTaskStatus.Accepted &&
+                                task.taskType === EmployeeTaskType.AmountReception && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTask(task);
+                                      setCompleteAmountReceptionForm({
+                                        amountReceived: 0,
+                                        note: task.note || '',
+                                      });
+                                      setShowCompleteModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 text-xs rounded-md bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  >
+                                    إكمال استلام مبلغ
+                                  </button>
+                                )}
                             </>
                           )}
                         </div>
