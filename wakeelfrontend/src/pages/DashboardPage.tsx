@@ -21,7 +21,7 @@ import { getAgentBalance } from '../utils/balance';
 import { useAuth } from '../contexts/AuthContext';
 import { useOffline } from '../contexts/OfflineContext';
 import { useDigits } from '../contexts/DigitsContext';
-import { fetchDebtsWithCache, fetchDashboardWithCache } from '../services/offlineSync';
+import { employeeCanManageEmployeeTasks } from '../utils/employeePermissions';
 import {
   buildRegionResellerFilterParams,
   filterResellersByRegion,
@@ -97,7 +97,10 @@ const DashboardPage: React.FC = () => {
   const isAgentOrSubAgentOrEmployee =
     user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Employee;
   const canManageEmployeeTasks =
-    user?.role === UserRole.Agent || user?.role === UserRole.SubAgent || user?.role === UserRole.Admin;
+    user?.role === UserRole.Agent ||
+    user?.role === UserRole.SubAgent ||
+    user?.role === UserRole.Admin ||
+    (user?.role === UserRole.Employee && employeeCanManageEmployeeTasks(user));
   const balanceQueryEnabled =
     user?.role !== UserRole.Employee || user?.canAccessAccounts !== false;
   const [balance, setBalance] = useState(0);

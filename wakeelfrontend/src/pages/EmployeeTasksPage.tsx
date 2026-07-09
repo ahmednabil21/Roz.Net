@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import Pagination from '../components/Pagination';
 import { useAuth } from '../contexts/AuthContext';
-import { employeeCanReceiveTaskRequests } from '../utils/employeePermissions';
+import { employeeCanReceiveTaskRequests, employeeCanManageEmployeeTasks } from '../utils/employeePermissions';
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService, ApiService } from '../services/api';
 import {
@@ -82,7 +82,11 @@ const EmployeeTasksPage: React.FC = () => {
   const { formatNumber } = useDigits();
   const queryClient = useQueryClient();
   const isEmployee = user?.role === UserRole.Employee;
-  const canManage = user?.role === UserRole.Admin || user?.role === UserRole.Agent || user?.role === UserRole.SubAgent;
+  const canManage =
+    user?.role === UserRole.Admin ||
+    user?.role === UserRole.Agent ||
+    user?.role === UserRole.SubAgent ||
+    employeeCanManageEmployeeTasks(user);
   const isAdmin = user?.role === UserRole.Admin;
 
   const [page, setPage] = useState(1);
@@ -239,10 +243,19 @@ const EmployeeTasksPage: React.FC = () => {
 
   const employeesOptions = isAdmin ? adminEmployees : myEmployees;
 
+  const useMyTasksEndpoint =
+    isEmployee && !canManage && employeeCanReceiveTaskRequests(user);
+
   const { data: tasksResponse, isLoading, refetch } = useQuery({
-    queryKey: ['employee-tasks', isEmployee ? 'my' : 'agent', taskQueryParams],
-    queryFn: () => (isEmployee ? apiService.getMyEmployeeTasks(taskQueryParams) : apiService.getAgentEmployeeTasks(taskQueryParams)),
-    enabled: !!user && (isEmployee || canManage) && (!isAdmin || !!taskQueryParams.agentId),
+    queryKey: ['employee-tasks', useMyTasksEndpoint ? 'my' : 'agent', taskQueryParams],
+    queryFn: () =>
+      useMyTasksEndpoint
+        ? apiService.getMyEmployeeTasks(taskQueryParams)
+        : apiService.getAgentEmployeeTasks(taskQueryParams),
+    enabled:
+      !!user &&
+      (canManage || (isEmployee && employeeCanReceiveTaskRequests(user))) &&
+      (!isAdmin || !!taskQueryParams.agentId),
   });
 
   // SignalR: إشعارات المهام الجديدة للموظف فقط

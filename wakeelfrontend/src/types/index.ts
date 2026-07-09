@@ -889,6 +889,8 @@ export interface EmployeePermissions {
   canViewAllSubscribers: boolean;
   /** السماح باستلام وتنفيذ طلبات المهام (EmployeeTasks). افتراضي false. */
   canReceiveTaskRequests: boolean;
+  /** إدارة مهام الموظفين: إنشاء وتعديل وحذف المهام وإسنادها للموظفين. افتراضي false. */
+  canManageEmployeeTasks: boolean;
 }
 
 export const DEFAULT_EMPLOYEE_PERMISSIONS: EmployeePermissions = {
@@ -902,6 +904,7 @@ export const DEFAULT_EMPLOYEE_PERMISSIONS: EmployeePermissions = {
   canAccessSubscriberDashboard: false,
   canViewAllSubscribers: false,
   canReceiveTaskRequests: false,
+  canManageEmployeeTasks: false,
 };
 
 /** تسميات الصلاحيات للعرض في الواجهة */
@@ -915,7 +918,8 @@ export const EMPLOYEE_PERMISSION_LABELS: Record<keyof EmployeePermissions, strin
   canAccessExpensesAndSalarySheet: 'الوصول إلى المصاريف وكشوفات الموظفين',
   canAccessSubscriberDashboard: 'مشاهدة لوحة تحكم المشتركين',
   canViewAllSubscribers: 'عرض كل المشتركين (بدون اشتراط البحث بالاسم)',
-  canReceiveTaskRequests: 'استلام طلبات المهام',
+  canReceiveTaskRequests: 'استلام وتنفيذ المهام',
+  canManageEmployeeTasks: 'ادارة مهام الموظفين',
 };
 
 export interface User {
@@ -977,6 +981,7 @@ export interface UserCreateRequest {
   canAccessSubscriberDashboard?: boolean;
   canViewAllSubscribers?: boolean;
   canReceiveTaskRequests?: boolean;
+  canManageEmployeeTasks?: boolean;
 }
 
 export interface UserUpdateRequest {
@@ -2036,6 +2041,7 @@ export interface AgentEmployeeCreateRequest {
   canAccessSubscriberDashboard?: boolean;
   canViewAllSubscribers?: boolean;
   canReceiveTaskRequests?: boolean;
+  canManageEmployeeTasks?: boolean;
   allowedResellerIds?: string[];
   pagePermissions?: EmployeePagePermissionSet[];
 }
@@ -2054,6 +2060,7 @@ export interface AgentEmployeeUpdateRequest {
   canAccessSubscriberDashboard?: boolean;
   canViewAllSubscribers?: boolean;
   canReceiveTaskRequests?: boolean;
+  canManageEmployeeTasks?: boolean;
   allowedResellerIds?: string[];
   pagePermissions?: EmployeePagePermissionSet[];
 }

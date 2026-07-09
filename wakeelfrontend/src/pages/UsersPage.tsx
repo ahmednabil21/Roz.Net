@@ -137,6 +137,8 @@ const UsersPage: React.FC = () => {
       payload.canAccessExpensesAndSalarySheet = addForm.canAccessExpensesAndSalarySheet ?? true;
       payload.canAccessSubscriberDashboard = addForm.canAccessSubscriberDashboard ?? false;
       payload.canViewAllSubscribers = addForm.canViewAllSubscribers ?? false;
+      payload.canReceiveTaskRequests = addForm.canReceiveTaskRequests ?? false;
+      payload.canManageEmployeeTasks = addForm.canManageEmployeeTasks ?? false;
     }
     createUserMutation.mutate(payload);
   };

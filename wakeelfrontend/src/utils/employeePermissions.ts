@@ -78,7 +78,7 @@ export const ADMIN_ROUTE_PERMISSIONS: AdminRoutePermissionRule[] = [
     pathPrefix: '/admin/employees/tasks',
     page: 'EmployeeManagement',
     anyAction: true,
-    legacyCheck: (u) => !!u.canReceiveTaskRequests,
+    legacyCheck: (u) => !!(u.canReceiveTaskRequests || u.canManageEmployeeTasks),
   },
   {
     pathPrefix: '/admin/employees',
@@ -201,8 +201,13 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
       if (action === 'sell' || action === 'return') return !!user.canDisburseMaterial;
       return !!user.canManageMaterialsAndSales;
     case 'EmployeeManagement':
-      if (action === 'view') return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales);
-      if (['addTask', 'editTask', 'deleteTask'].includes(action)) return !!user.canReceiveTaskRequests;
+      if (action === 'view') {
+        return !!(user.canManageEmployeeTasks || user.canManageMaterialsAndSales || user.canReceiveTaskRequests);
+      }
+      if (['manageEmployeeTasks', 'addTask', 'editTask', 'deleteTask'].includes(action)) {
+        return !!user.canManageEmployeeTasks;
+      }
+      if (action === 'receiveTasks') return !!user.canReceiveTaskRequests;
       if (['viewSalarySheets', 'addSalary', 'advance', 'deduction'].includes(action)) {
         return !!user.canAccessExpensesAndSalarySheet;
       }
@@ -231,7 +236,8 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
     Packages: ['view', 'add', 'edit', 'delete'],
     MaterialsAndSales: ['view', 'add', 'edit', 'delete', 'sell', 'return', 'salesLog', 'printInvoice'],
     EmployeeManagement: [
-      'view', 'addEmployee', 'editEmployee', 'deleteEmployee', 'addTask', 'deleteTask', 'editTask',
+      'view', 'addEmployee', 'editEmployee', 'deleteEmployee',
+      'manageEmployeeTasks', 'addTask', 'deleteTask', 'editTask', 'receiveTasks',
       'viewSalarySheets', 'addSalary', 'advance', 'deduction',
     ],
     GeneralExpenses: ['view', 'add', 'edit'],
@@ -284,7 +290,7 @@ export function employeeCanAccessEmployeeTasks(user: User | null | undefined): b
   if (usesPagePermissions(user)) {
     return hasAnyPageAction(user, 'EmployeeManagement');
   }
-  return !!user.canReceiveTaskRequests;
+  return !!(user.canReceiveTaskRequests || user.canManageEmployeeTasks);
 }
 
 export function employeeCanAccessExpenseFeatures(user: User | null | undefined): boolean {
@@ -304,11 +310,19 @@ export function employeeCanAccessExpenseFeatures(user: User | null | undefined):
 export function employeeCanReceiveTaskRequests(user: User | null | undefined): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
   if (usesPagePermissions(user)) {
-    return ['addTask', 'editTask', 'deleteTask'].some((a) =>
+    return hasPageAction(user, 'EmployeeManagement', 'receiveTasks');
+  }
+  return !!user.canReceiveTaskRequests;
+}
+
+export function employeeCanManageEmployeeTasks(user: User | null | undefined): boolean {
+  if (!user || user.role !== UserRole.Employee) return true;
+  if (usesPagePermissions(user)) {
+    return ['manageEmployeeTasks', 'addTask', 'editTask', 'deleteTask'].some((a) =>
       hasPageAction(user, 'EmployeeManagement', a)
     );
   }
-  return !!user.canReceiveTaskRequests;
+  return !!user.canManageEmployeeTasks;
 }
 
 export function employeeShowOnlyTasksInSidebar(user: User | null | undefined): boolean {

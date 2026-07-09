@@ -364,7 +364,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onClos
     if (user?.role === UserRole.Employee && !usesPagePermissions(user) && item.path === '/admin/dashboard' && !user.canAccessSubscriberDashboard) return false;
     if (user?.role === UserRole.Employee && usesPagePermissions(user) && item.path === '/admin/dashboard' && !employeeCanAccessDashboard(user)) return false;
     if (user?.role === UserRole.Employee && item.path === '/admin/employees/tasks' && !employeeCanAccessEmployeeTasks(user)) return false;
-    if (user?.role === UserRole.Employee && !usesPagePermissions(user) && item.path === '/admin/employees/tasks' && !user?.canReceiveTaskRequests) return false;
     if (isRestrictedEmployeeLegacy && restrictedEmployeeHiddenPaths.includes(item.path)) return false;
     if (
       item.requiresInvoiceAccess &&
