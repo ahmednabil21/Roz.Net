@@ -15,6 +15,7 @@ import {
   DashboardSummaryAmounts,
 } from '../components/dashboard/DashboardWidgets';
 import { apiService, ApiService } from '../services/api';
+import { fetchDashboardWithCache, fetchDebtsWithCache } from '../services/offlineSync';
 import { showSuccess, showError } from '../utils/notifications';
 import { createXlsxBlob } from '../utils/excelExport';
 import { getAgentBalance } from '../utils/balance';
