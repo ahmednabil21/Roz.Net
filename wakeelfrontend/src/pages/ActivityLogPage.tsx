@@ -370,3 +370,4 @@ const ActivityLogPage: React.FC = () => {
 };
 
 export default ActivityLogPage;
+
