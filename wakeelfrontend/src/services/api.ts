@@ -1655,6 +1655,7 @@ class ApiService {
         r?.localSubscriptionEndsAt ?? r?.LocalSubscriptionEndsAt ?? localExpirationDate ?? null,
       localExpirationDate,
       localActivationDate: r?.localActivationDate ?? r?.LocalActivationDate ?? null,
+      externalStartDate: r?.externalStartDate ?? r?.ExternalStartDate ?? null,
       zoneId: r?.zoneId ?? r?.ZoneId ?? null,
       activationType: r?.activationType ?? r?.ActivationType ?? null,
       diffFields,
@@ -1709,6 +1710,8 @@ class ApiService {
           row.new_expiration ??
           undefined) ||
         undefined,
+      activationDate:
+        (row.externalStartDate ?? row.localActivationDate ?? undefined) || undefined,
       zoneId: row.zoneId ?? undefined,
     };
     if (options?.serviceFeesId) {
@@ -3832,6 +3835,33 @@ class ApiService {
       { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
     );
     return response.data ?? {};
+  }
+
+  /** POST /providers/sas/synchronizationSAS/update-dates-all — تحديث تواريخ التفعيل/الانتهاء للكل بدون خصم */
+  async synchronizationSASUpdateDatesAll(params?: {
+    resellerId?: string;
+    agentId?: string;
+  }): Promise<import('../types').SasUpdateDatesAllResult> {
+    const query: Record<string, string> = {};
+    if (params?.resellerId) query.resellerId = params.resellerId;
+    if (params?.agentId) query.agentId = params.agentId;
+    const response = await this.api.post<import('../types').SasUpdateDatesAllResult>(
+      '/providers/sas/synchronizationSAS/update-dates-all',
+      {},
+      { params: Object.keys(query).length ? query : undefined, timeout: 600_000 }
+    );
+    const data = response.data ?? {};
+    return {
+      error: data.error ?? (data as any).Error ?? null,
+      totalDifferences: data.totalDifferences ?? (data as any).TotalDifferences ?? 0,
+      updated: data.updated ?? (data as any).Updated ?? 0,
+      failed: data.failed ?? (data as any).Failed ?? 0,
+      errors: Array.isArray(data.errors)
+        ? data.errors
+        : Array.isArray((data as any).Errors)
+          ? (data as any).Errors
+          : [],
+    };
   }
 
   /** POST /providers/sas/synchronizationFTTH/save — حفظ صف FTTH diff بدون خصم/فاتورة */

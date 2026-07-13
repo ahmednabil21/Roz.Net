@@ -576,6 +576,8 @@ const SubscribersPage: React.FC = () => {
   const [showFtthCompareFormModal, setShowFtthCompareFormModal] = useState(false);
   const [showFtthCompareModal, setShowFtthCompareModal] = useState(false);
   const [showFtthSyncTypeModal, setShowFtthSyncTypeModal] = useState(false);
+  const [showSasSyncTypeModal, setShowSasSyncTypeModal] = useState(false);
+  const [pendingSasSyncReseller, setPendingSasSyncReseller] = useState<AgentReseller | null>(null);
   const [showFtthWalletFormModal, setShowFtthWalletFormModal] = useState(false);
   const [showFtthAppTransactionsModal, setShowFtthAppTransactionsModal] = useState(false);
   const [ftthAppTransactionsResult, setFtthAppTransactionsResult] = useState<FtthAppTransactionsResponse | null>(null);
@@ -1495,6 +1497,51 @@ const SubscribersPage: React.FC = () => {
     },
   });
 
+  const sasUpdateDatesAllMutation = useMutation({
+    mutationFn: (selectedReseller?: AgentReseller | null) => {
+      const targetReseller = selectedReseller ?? pendingSasSyncReseller ?? autoSyncReseller;
+      return apiService.synchronizationSASUpdateDatesAll({
+        resellerId: targetReseller?.id || undefined,
+        agentId: user?.role === UserRole.Admin ? myAgent?.id : undefined,
+      });
+    },
+    onSuccess: (res) => {
+      if (res.error) {
+        showError('تحديث تاريخ فقط للكل', res.error);
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['subscribers'] });
+      const updated = res.updated ?? 0;
+      const failed = res.failed ?? 0;
+      const total = res.totalDifferences ?? 0;
+      if (failed > 0) {
+        showError(
+          'تحديث تاريخ فقط للكل',
+          `تم تحديث ${updated} من ${total}. فشل ${failed}${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}`,
+        );
+      } else {
+        showSuccess(
+          'تحديث تاريخ فقط للكل',
+          total === 0
+            ? 'لا توجد اختلافات لتحديثها.'
+            : `تم تحديث تواريخ ${updated} مشترك بدون استقطاع من الرصيد.`,
+        );
+      }
+      setShowSasSyncTypeModal(false);
+      setShowAutoSyncModal(false);
+    },
+    onError: (err: unknown) => {
+      showError('تحديث تاريخ فقط للكل', ApiService.showError(err));
+    },
+  });
+
+  const openSasSyncTypeModal = (reseller?: AgentReseller | null) => {
+    const target = reseller ?? autoSyncReseller ?? null;
+    setPendingSasSyncReseller(target);
+    if (target?.id) setSelectedSyncResellerId(target.id);
+    setShowSasSyncTypeModal(true);
+  };
+
   const ftthCompareMutation = useMutation({
     mutationFn: () => {
       if (!ftthCompareResellerId) {
@@ -1588,7 +1635,13 @@ const SubscribersPage: React.FC = () => {
   };
 
   const handleAutoSyncClick = () => {
-    if (ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending) return;
+    if (
+      ftthCompareMutation.isPending ||
+      ftthAppTransactionsMutation.isPending ||
+      synchronizationFtthMutation.isPending ||
+      sasUpdateDatesAllMutation.isPending
+    )
+      return;
 
     const hasFtth = ftthResellersForCompare.length > 0;
     const hasSas = myResellers.some((r) => r.serviceType === ServiceType.Sas);
@@ -1604,7 +1657,7 @@ const SubscribersPage: React.FC = () => {
     }
 
     if (hasSas) {
-      synchronizationFtthMutation.mutate(autoSyncReseller ?? undefined);
+      openSasSyncTypeModal(autoSyncReseller ?? undefined);
       return;
     }
 
@@ -3591,17 +3644,17 @@ const SubscribersPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAutoSyncClick}
-                disabled={ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending}
+                disabled={ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending || sasUpdateDatesAllMutation.isPending}
                 className="flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm sm:text-base transition-colors min-h-[44px] touch-manipulation border border-gray-300 dark:border-gray-600"
               >
-                <RefreshCw className={`h-4 w-4 ${ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending || sasUpdateDatesAllMutation.isPending ? 'animate-spin' : ''}`} />
                 <span>
-                  {ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending
+                  {ftthCompareMutation.isPending || ftthAppTransactionsMutation.isPending || synchronizationFtthMutation.isPending || sasUpdateDatesAllMutation.isPending
                     ? 'جاري المزامنة...'
                     : 'مزامنة تلقائيا'}
                 </span>
               </button>
-              {!ftthCompareMutation.isPending && !ftthAppTransactionsMutation.isPending && !synchronizationFtthMutation.isPending && !!ftthCompareResult && (
+              {!ftthCompareMutation.isPending && !ftthAppTransactionsMutation.isPending && !synchronizationFtthMutation.isPending && !sasUpdateDatesAllMutation.isPending && !!ftthCompareResult && (
                 <button
                   type="button"
                   onClick={() => setShowFtthCompareModal(true)}
@@ -6193,6 +6246,60 @@ const SubscribersPage: React.FC = () => {
         </div>
       )}
 
+      {showSasSyncTypeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">نوع مزامنة SAS</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+              اختر طريقة المزامنة مع لوحة SAS.
+            </p>
+            <div className="space-y-3">
+              <button
+                type="button"
+                disabled={synchronizationFtthMutation.isPending || sasUpdateDatesAllMutation.isPending}
+                onClick={() => {
+                  setShowSasSyncTypeModal(false);
+                  synchronizationFtthMutation.mutate(pendingSasSyncReseller ?? undefined);
+                }}
+                className="w-full text-right px-4 py-4 rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-300 transition-colors disabled:opacity-60"
+              >
+                <span className="block font-semibold text-gray-900 dark:text-white">عرض اختلافات تاريخ الانتهاء</span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  جلب القائمة ومراجعتها ثم المزامنة يدوياً لكل مشترك.
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={synchronizationFtthMutation.isPending || sasUpdateDatesAllMutation.isPending}
+                onClick={() => sasUpdateDatesAllMutation.mutate(pendingSasSyncReseller ?? undefined)}
+                className="w-full text-right px-4 py-4 rounded-xl border border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors disabled:opacity-60"
+              >
+                <span className="block font-semibold text-gray-900 dark:text-white inline-flex items-center gap-2">
+                  {sasUpdateDatesAllMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
+                  تحديث تاريخ فقط للكل
+                </span>
+                <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  تحديث تواريخ التفعيل والانتهاء لجميع الاختلافات بدون استقطاع من الرصيد أو فواتير.
+                </span>
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                disabled={sasUpdateDatesAllMutation.isPending}
+                onClick={() => {
+                  setShowSasSyncTypeModal(false);
+                  setPendingSasSyncReseller(null);
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg disabled:opacity-60"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showFtthWalletFormModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
@@ -7052,7 +7159,18 @@ const SubscribersPage: React.FC = () => {
               </table>
             </div>
 
-            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+            <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+              {autoSyncReseller?.serviceType === ServiceType.Sas && (
+                <button
+                  type="button"
+                  disabled={sasUpdateDatesAllMutation.isPending || (autoSyncFtthResult?.data?.length ?? 0) === 0}
+                  onClick={() => sasUpdateDatesAllMutation.mutate(autoSyncReseller ?? pendingSasSyncReseller ?? undefined)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md disabled:opacity-60"
+                >
+                  {sasUpdateDatesAllMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}
+                  تحديث تاريخ فقط للكل
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowAutoSyncModal(false)}
@@ -7080,7 +7198,7 @@ const SubscribersPage: React.FC = () => {
                   onClick={() => {
                     setShowAutoSyncResellerPickerModal(false);
                     if (r.serviceType === ServiceType.Sas) {
-                      synchronizationFtthMutation.mutate(r);
+                      openSasSyncTypeModal(r);
                     } else {
                       setFtthCompareRegionId(r.regionId || '');
                       setFtthCompareResellerId(r.id);

@@ -515,6 +515,7 @@ export interface CashbackSynchronizationFtthRow {
   externalMsisdn?: string | null;
   localUsername?: string | null;
   localActivationDate?: string | null;
+  externalStartDate?: string | null;
   externalEndDate?: string | null;
   localExpirationDate?: string | null;
   externalOfferName?: string | null;
@@ -537,9 +538,20 @@ export interface SynchronizationDiffSaveRequest {
   deviceUsername?: string;
   subscriptionName?: string;
   subscriptionEndsAt?: string;
+  /** تاريخ التفعيل — لتحديث التواريخ فقط */
+  activationDate?: string;
   zoneId?: string;
   serviceFeesId?: string;
   serviceFeesAmountPaid?: number;
+}
+
+/** استجابة POST .../synchronizationSAS/update-dates-all */
+export interface SasUpdateDatesAllResult {
+  error?: string | null;
+  totalDifferences?: number;
+  updated?: number;
+  failed?: number;
+  errors?: string[];
 }
 
 /** فترة تفعيل واحدة ضمن مزامنة FTTH (شهر/فاتورة) */
