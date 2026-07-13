@@ -1080,6 +1080,11 @@ const SubscribersPage: React.FC = () => {
     [myResellers]
   );
   const autoSyncReseller = React.useMemo(() => {
+    // أولوية: كارد الرسيلر المختار في الشريط الجانبي
+    if (selectedOperationalResellerId) {
+      const fromCard = myResellers.find((r) => r.id === selectedOperationalResellerId);
+      if (fromCard) return fromCard;
+    }
     if (selectedSyncResellerId) {
       const chosen = myResellers.find((r) => r.id === selectedSyncResellerId);
       if (chosen) return chosen;
@@ -1089,11 +1094,13 @@ const SubscribersPage: React.FC = () => {
       if (byAgentType) return byAgentType;
     }
     return defaultFtthReseller ?? myResellers[0] ?? null;
-  }, [selectedSyncResellerId, myResellers, myAgent?.serviceType, defaultFtthReseller]);
-  const hasMixedResellerTypes = React.useMemo(() => {
-    const types = new Set((myResellers ?? []).map((r) => r.serviceType));
-    return types.size > 1;
-  }, [myResellers]);
+  }, [
+    selectedOperationalResellerId,
+    selectedSyncResellerId,
+    myResellers,
+    myAgent?.serviceType,
+    defaultFtthReseller,
+  ]);
   const [pendingActivateSubscriberId, setPendingActivateSubscriberId] = useState<string | null>(null);
   const hasWhatsAppSession = hasOperationalWhatsAppSession([], null, myAgent?.whatsAppSessionId);
 
@@ -1538,7 +1545,15 @@ const SubscribersPage: React.FC = () => {
   const openSasSyncTypeModal = (reseller?: AgentReseller | null) => {
     const target = reseller ?? autoSyncReseller ?? null;
     setPendingSasSyncReseller(target);
-    if (target?.id) setSelectedSyncResellerId(target.id);
+    if (target?.id) {
+      setSelectedSyncResellerId(target.id);
+      setSelectedOperationalResellerId(target.id);
+      saveStoredOperationalResellerId(target.id);
+      if (target.regionId) {
+        setSelectedOperationalRegionId(target.regionId);
+        saveStoredOperationalRegionId(target.regionId);
+      }
+    }
     setShowSasSyncTypeModal(true);
   };
 
@@ -1643,10 +1658,28 @@ const SubscribersPage: React.FC = () => {
     )
       return;
 
+    const sasResellers = myResellers.filter((r) => r.serviceType === ServiceType.Sas);
     const hasFtth = ftthResellersForCompare.length > 0;
-    const hasSas = myResellers.some((r) => r.serviceType === ServiceType.Sas);
+    const hasSas = sasResellers.length > 0;
 
-    if (hasFtth && hasSas && hasMixedResellerTypes) {
+    // استخدم كارد الرسيلر المختار في الفرونت إن وُجد
+    const cardReseller = selectedOperationalResellerId
+      ? myResellers.find((r) => r.id === selectedOperationalResellerId) ?? null
+      : null;
+
+    if (cardReseller) {
+      if (cardReseller.serviceType === ServiceType.Sas) {
+        openSasSyncTypeModal(cardReseller);
+        return;
+      }
+      setFtthCompareRegionId(cardReseller.regionId || selectedOperationalRegionId || '');
+      setFtthCompareResellerId(cardReseller.id);
+      setFtthComparePartnerId(resolveFtthComparePartnerId(ftthResellersForCompare, cardReseller.id));
+      setShowFtthSyncTypeModal(true);
+      return;
+    }
+
+    if (hasFtth && hasSas) {
       setShowAutoSyncResellerPickerModal(true);
       return;
     }
@@ -1657,7 +1690,11 @@ const SubscribersPage: React.FC = () => {
     }
 
     if (hasSas) {
-      openSasSyncTypeModal(autoSyncReseller ?? undefined);
+      if (sasResellers.length > 1) {
+        setShowAutoSyncResellerPickerModal(true);
+        return;
+      }
+      openSasSyncTypeModal(sasResellers[0]);
       return;
     }
 
