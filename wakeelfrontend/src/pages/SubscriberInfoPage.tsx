@@ -38,6 +38,7 @@ const AD_SLIDES = [
 ];
 
 const DEFAULT_GRADIENT_START = '#2962FF';
+
 const DEFAULT_GRADIENT_END = '#1E40AF';
 
 const PROBLEM_TYPE_OPTIONS: { value: SubscriberAppProblemType; label: string }[] = [
