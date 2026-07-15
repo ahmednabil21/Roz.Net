@@ -19,6 +19,7 @@ import {
   Clock,
   Receipt,
   Wifi,
+  Check,
   CheckCircle2,
   XCircle,
   ChevronLeft,
@@ -54,15 +55,84 @@ const problemTypeLabel = (type?: SubscriberAppProblemType | number | null) => {
   return found?.label ?? '—';
 };
 
-const maintenanceStatusClass = (status: SubscriberMaintenanceRequestDto['status']) => {
+const MAINTENANCE_STEPS = [
+  { step: 1, label: 'قيد الانتظار' },
+  { step: 2, label: 'تم قبول الطلب من قبل الشركة' },
+  { step: 3, label: 'تم تعيين موظف فني وهو في طريقه اليك' },
+  { step: 4, label: 'تم اكمال الطلب' },
+] as const;
+
+/** يحول حالة الطلب إلى رقم المرحلة الحالية (1–4). الرفض = null. */
+const getMaintenanceStepIndex = (status: SubscriberMaintenanceRequestDto['status']): number | null => {
   const n = typeof status === 'number' ? status : null;
   const s = typeof status === 'string' ? status.toLowerCase() : '';
-  if (n === 1 || s === 'pending') return 'bg-amber-100 text-amber-800';
-  if (n === 2 || s === 'accepted' || s === 'inprogress') return 'bg-blue-100 text-blue-800';
-  if (n === 5 || s === 'technicianassigned') return 'bg-indigo-100 text-indigo-800';
-  if (n === 3 || s === 'completed') return 'bg-green-100 text-green-800';
-  if (n === 4 || s === 'rejected' || s === 'cancelled') return 'bg-rose-100 text-rose-800';
-  return 'bg-slate-100 text-slate-600';
+  if (n === 4 || s === 'rejected' || s === 'cancelled') return null;
+  if (n === 1 || s === 'pending') return 1;
+  if (n === 2 || s === 'accepted' || s === 'inprogress') return 2;
+  if (n === 5 || s === 'technicianassigned') return 3;
+  if (n === 3 || s === 'completed') return 4;
+  return 1;
+};
+
+const MaintenanceStatusStepper: React.FC<{
+  status: SubscriberMaintenanceRequestDto['status'];
+  statusLabel?: string;
+}> = ({ status, statusLabel }) => {
+  const current = getMaintenanceStepIndex(status);
+
+  if (current == null) {
+    return (
+      <div className="rounded-xl bg-rose-50 border border-rose-100 px-3 py-2.5 text-center">
+        <p className="text-sm font-semibold text-rose-700">{statusLabel || 'مرفوض'}</p>
+      </div>
+    );
+  }
+
+  const progressPercent = current <= 1 ? 0 : ((current - 1) / (MAINTENANCE_STEPS.length - 1)) * 100;
+
+  return (
+    <div className="pt-1 pb-0.5 space-y-2.5" dir="ltr">
+      <div className="relative px-1">
+        <div className="absolute top-4 left-[1.25rem] right-[1.25rem] h-[3px] rounded-full bg-slate-200" />
+        <div
+          className="absolute top-4 left-[1.25rem] h-[3px] rounded-full bg-[#2962FF] transition-all duration-300"
+          style={{ width: `calc((100% - 2.5rem) * ${progressPercent / 100})` }}
+        />
+        <div className="relative flex justify-between items-start">
+          {MAINTENANCE_STEPS.map((item) => {
+            const stepNum = item.step;
+            const done = stepNum < current || (current === 4 && stepNum === 4);
+            const active = stepNum === current && current < 4;
+            const upcoming = stepNum > current;
+            const highlight = done || active;
+
+            return (
+              <div key={stepNum} className="flex flex-col items-center w-[4.5rem] sm:w-[5.5rem]">
+                <div
+                  className={`
+                    w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-bold bg-white
+                    ${done ? '!bg-[#2962FF] text-white border-0' : ''}
+                    ${active ? 'border-[3px] border-[#2962FF] text-[#2962FF]' : ''}
+                    ${upcoming ? 'bg-slate-200 text-white border-0' : ''}
+                  `}
+                >
+                  {done ? <Check className="w-4 h-4" strokeWidth={3} /> : stepNum}
+                </div>
+                <p
+                  className={`mt-2 text-center text-[10px] leading-snug ${
+                    highlight ? 'text-[#2962FF] font-semibold' : 'text-slate-400'
+                  }`}
+                  dir="rtl"
+                >
+                  {item.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const SUBSCRIBER_TOKEN_KEY = 'subscriberToken';
@@ -621,19 +691,15 @@ const SubscriberInfoPage: React.FC = () => {
                 <ul className="space-y-3">
                   {maintenanceRequests.map((req) => (
                     <li key={req.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <p className="font-semibold text-slate-800 text-sm">
-                          {req.problemTypeLabel || problemTypeLabel(req.problemType)}
-                        </p>
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${maintenanceStatusClass(req.status)}`}>
-                          {req.statusLabel || req.status}
-                        </span>
-                      </div>
+                      <p className="font-semibold text-slate-800 text-sm mb-3">
+                        {req.problemTypeLabel || problemTypeLabel(req.problemType)}
+                      </p>
+                      <MaintenanceStatusStepper status={req.status} statusLabel={req.statusLabel} />
                       {req.description ? (
-                        <p className="text-slate-600 text-sm mb-2">{req.description}</p>
+                        <p className="text-slate-600 text-sm mt-3 mb-0">{req.description}</p>
                       ) : null}
                       {req.agentNote ? (
-                        <div className="mb-2 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2">
+                        <div className="mt-3 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2">
                           <p className="text-xs font-semibold text-blue-700 mb-0.5 inline-flex items-center gap-1">
                             <MessageSquare className="w-3.5 h-3.5" />
                             ملاحظة الشركة
@@ -641,7 +707,7 @@ const SubscriberInfoPage: React.FC = () => {
                           <p className="text-sm text-blue-900">{req.agentNote}</p>
                         </div>
                       ) : null}
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-3">
                         {req.createdAt ? (
                           <span className="inline-flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
