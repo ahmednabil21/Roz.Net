@@ -2379,11 +2379,38 @@ class ApiService {
 
   /** جلب طلبات الصيانة — GET /SubscriberApp/maintenance-requests */
   async getSubscriberMaintenanceRequests(): Promise<SubscriberMaintenanceRequestDto[]> {
-    const response = await this.api.get<SubscriberMaintenanceRequestDto[]>('/SubscriberApp/maintenance-requests', {
+    const response = await this.api.get<unknown>('/SubscriberApp/maintenance-requests', {
       useSubscriberAuth: true,
       skipAuthRedirect: true,
     });
-    return Array.isArray(response.data) ? response.data : [];
+    const list = Array.isArray(response.data) ? response.data : [];
+    return list.map((item) => this.normalizeSubscriberMaintenanceRequest(item));
+  }
+
+  private normalizeSubscriberMaintenanceRequest(raw: unknown): SubscriberMaintenanceRequestDto {
+    if (raw == null || typeof raw !== 'object') {
+      return raw as SubscriberMaintenanceRequestDto;
+    }
+    const r = raw as Record<string, unknown>;
+    const str = (camel: string, pascal: string) => {
+      const v = r[camel] ?? r[pascal];
+      return v == null || v === '' ? undefined : String(v);
+    };
+    const statusRaw = r.status ?? r.Status;
+    const statusNum = Number(statusRaw);
+    return {
+      id: String(r.id ?? r.Id ?? ''),
+      problemType: Number(r.problemType ?? r.ProblemType) as SubscriberMaintenanceRequestDto['problemType'],
+      problemTypeLabel: str('problemTypeLabel', 'ProblemTypeLabel'),
+      description: str('description', 'Description'),
+      alternativePhoneNumber: str('alternativePhoneNumber', 'AlternativePhoneNumber'),
+      status: (Number.isFinite(statusNum) ? statusNum : statusRaw) as SubscriberMaintenanceRequestDto['status'],
+      statusLabel: str('statusLabel', 'StatusLabel'),
+      agentNote: str('agentNote', 'AgentNote'),
+      employeeTaskId: str('employeeTaskId', 'EmployeeTaskId'),
+      createdAt: str('createdAt', 'CreatedAt'),
+      updatedAt: str('updatedAt', 'UpdatedAt'),
+    };
   }
 
   /** جلب طلبات صيانة المشتركين للوكيل — GET /SubscriberMaintenanceRequests/agent */
@@ -2399,6 +2426,23 @@ class ApiService {
   /** قبول طلب صيانة — POST /SubscriberMaintenanceRequests/{id}/accept */
   async acceptSubscriberMaintenanceRequest(id: string): Promise<AgentSubscriberMaintenanceRequestDto> {
     const response = await this.api.post<unknown>(`/SubscriberMaintenanceRequests/${encodeURIComponent(id)}/accept`);
+    return this.normalizeAgentSubscriberMaintenanceRequest(response.data);
+  }
+
+  /** رفض طلب صيانة — POST /SubscriberMaintenanceRequests/{id}/reject */
+  async rejectSubscriberMaintenanceRequest(id: string, note?: string): Promise<AgentSubscriberMaintenanceRequestDto> {
+    const response = await this.api.post<unknown>(
+      `/SubscriberMaintenanceRequests/${encodeURIComponent(id)}/reject`,
+      note ? { note } : {}
+    );
+    return this.normalizeAgentSubscriberMaintenanceRequest(response.data);
+  }
+
+  /** رد بملاحظة على طلب صيانة — POST /SubscriberMaintenanceRequests/{id}/reply */
+  async replySubscriberMaintenanceRequest(id: string, note: string): Promise<AgentSubscriberMaintenanceRequestDto> {
+    const response = await this.api.post<unknown>(`/SubscriberMaintenanceRequests/${encodeURIComponent(id)}/reply`, {
+      note,
+    });
     return this.normalizeAgentSubscriberMaintenanceRequest(response.data);
   }
 
@@ -2418,6 +2462,7 @@ class ApiService {
     };
     return {
       id: String(r.id ?? r.Id ?? ''),
+      agentId: str('agentId', 'AgentId'),
       subscriberId: str('subscriberId', 'SubscriberId'),
       problemType: num('problemType', 'ProblemType'),
       problemTypeLabel: str('problemTypeLabel', 'ProblemTypeLabel'),
@@ -2425,6 +2470,8 @@ class ApiService {
       alternativePhoneNumber: str('alternativePhoneNumber', 'AlternativePhoneNumber'),
       status: num('status', 'Status'),
       statusLabel: str('statusLabel', 'StatusLabel'),
+      agentNote: str('agentNote', 'AgentNote'),
+      employeeTaskId: str('employeeTaskId', 'EmployeeTaskId'),
       createdAt: str('createdAt', 'CreatedAt'),
       updatedAt: str('updatedAt', 'UpdatedAt'),
       acceptedAt: str('acceptedAt', 'AcceptedAt'),

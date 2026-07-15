@@ -138,7 +138,14 @@ export enum SubscriberAppProblemType {
   Other = 5,
 }
 
-export type SubscriberMaintenanceRequestStatus = 'pending' | 'inProgress' | 'completed' | 'cancelled';
+export type SubscriberMaintenanceRequestStatus =
+  | 'pending'
+  | 'accepted'
+  | 'inProgress'
+  | 'technicianAssigned'
+  | 'completed'
+  | 'rejected'
+  | 'cancelled';
 
 export interface SubscriberMaintenanceRequestCreate {
   problemType: SubscriberAppProblemType;
@@ -152,22 +159,35 @@ export interface SubscriberMaintenanceRequestDto {
   problemTypeLabel?: string;
   description?: string;
   alternativePhoneNumber?: string;
-  status: SubscriberMaintenanceRequestStatus;
+  status: SubscriberMaintenanceRequestStatus | number;
   statusLabel?: string;
+  agentNote?: string;
+  employeeTaskId?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
-/** حالة طلب الصيانة (API الوكيل) — 1 قيد الانتظار، 2 قيد المعالجة، 3 مكتمل، 4 ملغي */
+/**
+ * حالة طلب الصيانة:
+ * 1 قيد الانتظار، 2 تم قبول الطلب من قبل الشركة،
+ * 3 تم اكمال الطلب، 4 مرفوض، 5 تم تعيين موظف فني وهو في طريقه اليك
+ */
 export enum SubscriberMaintenanceRequestStatusCode {
   Pending = 1,
+  Accepted = 2,
+  /** @deprecated استخدم Accepted */
   InProgress = 2,
   Completed = 3,
+  Rejected = 4,
+  /** @deprecated استخدم Rejected */
   Cancelled = 4,
+  TechnicianAssigned = 5,
 }
 
 /** طلب صيانة مشترك — GET /SubscriberMaintenanceRequests/agent */
 export interface AgentSubscriberMaintenanceRequestDto {
   id: string;
+  agentId?: string;
   subscriberId?: string;
   problemType: SubscriberAppProblemType | number;
   problemTypeLabel?: string;
@@ -175,6 +195,8 @@ export interface AgentSubscriberMaintenanceRequestDto {
   alternativePhoneNumber?: string;
   status: SubscriberMaintenanceRequestStatusCode | number;
   statusLabel?: string;
+  agentNote?: string;
+  employeeTaskId?: string;
   createdAt?: string;
   updatedAt?: string;
   acceptedAt?: string;
@@ -1387,6 +1409,8 @@ export interface EmployeeTaskCreateRequest {
   /** true: يُشترط TotalDebt > 0 لكل المشتركين المختارين */
   debtCollection?: boolean;
   maintenanceType?: SubscriberMaintenanceKind;
+  /** ربط بمهمة من طلب صيانة مشترك — يحدّث حالة الطلب تلقائياً */
+  maintenanceRequestId?: string;
   amountReceived?: number;
   taskTitle?: string;
   /** تفاصيل إضافية (غالباً ما يقرأها الباكند مع دفعة المهام) */

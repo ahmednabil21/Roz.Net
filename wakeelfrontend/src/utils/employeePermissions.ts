@@ -184,7 +184,13 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
       if (action === 'details') return !!user.canViewAllSubscribers;
       return false;
     case 'MaintenanceRequests':
-      return action === 'view' || action === 'accept';
+      return (
+        action === 'view' ||
+        action === 'accept' ||
+        action === 'reject' ||
+        action === 'reply' ||
+        action === 'convert'
+      );
     case 'Activations':
       if (action === 'view' || action === 'print') return !!user.canAccessInvoices;
       if (action === 'delete') return !!user.canAccessAccounts;
@@ -229,7 +235,7 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
   const catalogActions: Record<string, string[]> = {
     Dashboard: ['view'],
     Subscribers: ['view', 'add', 'edit', 'delete', 'activate', 'details', 'sync'],
-    MaintenanceRequests: ['view', 'accept'],
+    MaintenanceRequests: ['view', 'accept', 'reject', 'reply', 'convert'],
     Activations: ['view', 'print', 'delete'],
     Debts: ['view', 'add', 'edit', 'delete', 'pay'],
     Accounts: ['view', 'delete'],
