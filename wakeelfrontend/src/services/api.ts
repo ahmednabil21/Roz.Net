@@ -2446,6 +2446,15 @@ class ApiService {
     return this.normalizeAgentSubscriberMaintenanceRequest(response.data);
   }
 
+  /** إكمال طلب صيانة مباشرة — POST /SubscriberMaintenanceRequests/{id}/complete */
+  async completeSubscriberMaintenanceRequest(id: string, note?: string): Promise<AgentSubscriberMaintenanceRequestDto> {
+    const response = await this.api.post<unknown>(
+      `/SubscriberMaintenanceRequests/${encodeURIComponent(id)}/complete`,
+      note ? { note } : {}
+    );
+    return this.normalizeAgentSubscriberMaintenanceRequest(response.data);
+  }
+
   private normalizeAgentSubscriberMaintenanceRequest(raw: unknown): AgentSubscriberMaintenanceRequestDto {
     if (raw == null || typeof raw !== 'object') {
       return raw as AgentSubscriberMaintenanceRequestDto;

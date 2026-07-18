@@ -18,14 +18,15 @@ import {
 import { showError, showSuccess } from '../utils/notifications';
 import {
   CheckCircle2,
+  CircleCheckBig,
   MessageSquare,
   Phone,
   RefreshCw,
   User as UserIcon,
+  UserPlus,
   Wrench,
   X,
   XCircle,
-  ArrowRightLeft,
 } from 'lucide-react';
 
 const DASHBOARD_MAINTENANCE_AGENT_KEY = 'wakeel_maintenance_requests_agentId';
@@ -90,7 +91,10 @@ const maintenanceQueryKey = (status: '' | number, agentId?: string) =>
 const matchesStatusFilter = (req: AgentSubscriberMaintenanceRequestDto, status: '' | number) =>
   status === '' || Number(req.status) === status;
 
-type NoteModalMode = 'reject' | 'reply';
+const actionBtnBase =
+  'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm';
+
+type NoteModalMode = 'reject' | 'reply' | 'complete';
 
 const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const { user } = useAuth();
@@ -104,6 +108,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const canReject = !isEmployee || hasPageAction(user, 'MaintenanceRequests', 'reject');
   const canReply = !isEmployee || hasPageAction(user, 'MaintenanceRequests', 'reply');
   const canConvert = !isEmployee || hasPageAction(user, 'MaintenanceRequests', 'convert');
+  const canComplete = !isEmployee || hasPageAction(user, 'MaintenanceRequests', 'complete');
 
   const [statusFilter, setStatusFilter] = useState<'' | SubscriberMaintenanceRequestStatusCode>('');
   const [selectedAgentId, setSelectedAgentId] = useState('');
@@ -254,17 +259,29 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
     onSettled: () => setActionId(null),
   });
 
+  const completeMutation = useMutation({
+    mutationFn: ({ id, note }: { id: string; note?: string }) =>
+      apiService.completeSubscriberMaintenanceRequest(id, note),
+    onMutate: ({ id }) => setActionId(id),
+    onSuccess: (updated) => {
+      upsertRequestInCache(updated);
+      refreshPendingCount();
+      setNoteModal(null);
+      setNoteText('');
+      showSuccess('تم الإكمال', 'تم إكمال طلب الصيانة');
+    },
+    onError: (err: Error) => showError('فشل الإكمال', err.message || 'تعذّر إكمال الطلب'),
+    onSettled: () => setActionId(null),
+  });
+
   const convertMutation = useMutation({
     mutationFn: (payload: EmployeeTaskCreateRequest) => apiService.createEmployeeTask(payload),
-    onSuccess: (_task, variables) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-subscriber-maintenance'] });
       queryClient.invalidateQueries({ queryKey: ['employee-tasks'] });
       refreshPendingCount();
       setConvertRequest(null);
       showSuccess('تم التحويل', 'تم إنشاء المهمة وتعيين الموظف الفني');
-      if (variables.maintenanceRequestId) {
-        // الحالة تتحدث عبر SignalR أو الـ invalidate أعلاه
-      }
     },
     onError: (err: Error) => showError('فشل التحويل', err.message || 'تعذّر إنشاء المهمة'),
   });
@@ -282,6 +299,13 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
     });
   };
 
+  const noteModalTitle =
+    noteModal?.mode === 'reject'
+      ? 'رفض المهمة'
+      : noteModal?.mode === 'complete'
+        ? 'إكمال المهمة'
+        : 'رد مباشر للمشترك';
+
   const submitNoteModal = () => {
     if (!noteModal) return;
     const trimmed = noteText.trim();
@@ -291,6 +315,10 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         return;
       }
       replyMutation.mutate({ id: noteModal.request.id, note: trimmed });
+      return;
+    }
+    if (noteModal.mode === 'complete') {
+      completeMutation.mutate({ id: noteModal.request.id, note: trimmed || undefined });
       return;
     }
     rejectMutation.mutate({ id: noteModal.request.id, note: trimmed || undefined });
@@ -314,6 +342,8 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const pendingCount = requests.filter(
     (r) => Number(r.status) === SubscriberMaintenanceRequestStatusCode.Pending
   ).length;
+
+  const noteBusy = rejectMutation.isPending || replyMutation.isPending || completeMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -386,7 +416,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
           <div className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">لا توجد طلبات صيانة.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <table className="min-w-[1100px] w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">المشترك</th>
@@ -397,7 +427,9 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">الهاتف</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">الحالة</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">التاريخ</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300">إجراء</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 min-w-[340px] w-[340px]">
+                    الإجراءات
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -405,10 +437,15 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
                   const statusNum = Number(req.status);
                   const isPending = statusNum === SubscriberMaintenanceRequestStatusCode.Pending;
                   const isAccepted = statusNum === SubscriberMaintenanceRequestStatusCode.Accepted;
-                  const canActOnOpen =
-                    isPending || isAccepted || statusNum === SubscriberMaintenanceRequestStatusCode.TechnicianAssigned;
+                  const isTechnicianAssigned =
+                    statusNum === SubscriberMaintenanceRequestStatusCode.TechnicianAssigned;
+                  const showPostAcceptActions = isAccepted || isTechnicianAssigned;
                   const phone = req.alternativePhoneNumber || req.subscriberPhoneNumber;
                   const busy = actionId === req.id;
+                  const hasAnyAction =
+                    (isPending && (canAccept || canReject)) ||
+                    (showPostAcceptActions &&
+                      ((isAccepted && canConvert) || canReply || canComplete));
 
                   return (
                     <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
@@ -464,62 +501,86 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                         {req.createdAt ? formatDate(req.createdAt) : '—'}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {isPending && canAccept && (
-                            <button
-                              type="button"
-                              onClick={() => acceptMutation.mutate(req.id)}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-60"
-                            >
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              {busy && acceptMutation.isPending ? 'جاري...' : 'قبول'}
-                            </button>
-                          )}
-                          {(isPending || isAccepted) && canReject && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNoteText('');
-                                setNoteModal({ mode: 'reject', request: req });
-                              }}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-60"
-                            >
-                              <XCircle className="h-3.5 w-3.5" />
-                              رفض
-                            </button>
-                          )}
-                          {canActOnOpen && canReply && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNoteText(req.agentNote || '');
-                                setNoteModal({ mode: 'reply', request: req });
-                              }}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-slate-600 hover:bg-slate-700 text-white disabled:opacity-60"
-                            >
-                              <MessageSquare className="h-3.5 w-3.5" />
-                              رد بملاحظة
-                            </button>
-                          )}
-                          {isAccepted && canConvert && (
-                            <button
-                              type="button"
-                              onClick={() => openConvertModal(req)}
-                              disabled={busy}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-60"
-                            >
-                              <ArrowRightLeft className="h-3.5 w-3.5" />
-                              تحويل المهمة
-                            </button>
-                          )}
-                          {!isPending && !isAccepted && !canActOnOpen && (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </div>
+                      <td className="px-4 py-3 align-middle min-w-[340px] w-[340px]">
+                        {!hasAnyAction ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : (
+                          <div className="flex flex-col gap-2 w-full">
+                            {isPending && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {canAccept && (
+                                  <button
+                                    type="button"
+                                    onClick={() => acceptMutation.mutate(req.id)}
+                                    disabled={busy}
+                                    className={`${actionBtnBase} bg-emerald-600 hover:bg-emerald-700 text-white`}
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                    {busy && acceptMutation.isPending ? 'جاري...' : 'قبول المهمة'}
+                                  </button>
+                                )}
+                                {canReject && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNoteText('');
+                                      setNoteModal({ mode: 'reject', request: req });
+                                    }}
+                                    disabled={busy}
+                                    className={`${actionBtnBase} bg-rose-600 hover:bg-rose-700 text-white`}
+                                  >
+                                    <XCircle className="h-3.5 w-3.5 shrink-0" />
+                                    رفض المهمة
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {showPostAcceptActions && (
+                              <div className="grid grid-cols-1 gap-2">
+                                {isAccepted && canConvert && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openConvertModal(req)}
+                                    disabled={busy}
+                                    className={`${actionBtnBase} w-full bg-indigo-600 hover:bg-indigo-700 text-white`}
+                                  >
+                                    <UserPlus className="h-3.5 w-3.5 shrink-0" />
+                                    تحويل الى موظف
+                                  </button>
+                                )}
+                                {canReply && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNoteText(req.agentNote || '');
+                                      setNoteModal({ mode: 'reply', request: req });
+                                    }}
+                                    disabled={busy}
+                                    className={`${actionBtnBase} w-full bg-slate-600 hover:bg-slate-700 text-white`}
+                                  >
+                                    <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                                    رد مباشر
+                                  </button>
+                                )}
+                                {canComplete && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNoteText('');
+                                      setNoteModal({ mode: 'complete', request: req });
+                                    }}
+                                    disabled={busy}
+                                    className={`${actionBtnBase} w-full bg-teal-600 hover:bg-teal-700 text-white`}
+                                  >
+                                    <CircleCheckBig className="h-3.5 w-3.5 shrink-0" />
+                                    اكمال المهمة
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -534,9 +595,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3">
           <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                {noteModal.mode === 'reject' ? 'رفض طلب الصيانة' : 'رد بملاحظة للمشترك'}
-              </h3>
+              <h3 className="font-semibold text-gray-900 dark:text-white">{noteModalTitle}</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -559,7 +618,9 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
                 placeholder={
                   noteModal.mode === 'reject'
                     ? 'سبب الرفض (اختياري) — يظهر للمشترك إن وُجد'
-                    : 'اكتب ملاحظة تظهر للمشترك...'
+                    : noteModal.mode === 'complete'
+                      ? 'ملاحظة الإكمال (اختياري) — تظهر للمشترك إن وُجدت'
+                      : 'اكتب ملاحظة تظهر للمشترك...'
                 }
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
               />
@@ -577,16 +638,22 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={submitNoteModal}
-                  disabled={rejectMutation.isPending || replyMutation.isPending}
+                  disabled={noteBusy}
                   className={`px-3 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-60 ${
-                    noteModal.mode === 'reject' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-primary-600 hover:bg-primary-700'
+                    noteModal.mode === 'reject'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : noteModal.mode === 'complete'
+                        ? 'bg-teal-600 hover:bg-teal-700'
+                        : 'bg-primary-600 hover:bg-primary-700'
                   }`}
                 >
-                  {rejectMutation.isPending || replyMutation.isPending
+                  {noteBusy
                     ? 'جاري...'
                     : noteModal.mode === 'reject'
                       ? 'تأكيد الرفض'
-                      : 'إرسال الملاحظة'}
+                      : noteModal.mode === 'complete'
+                        ? 'تأكيد الإكمال'
+                        : 'إرسال الملاحظة'}
                 </button>
               </div>
             </div>
@@ -598,7 +665,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3">
           <div className="w-full max-w-xl bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 dark:text-white">إضافة مهمة — تحويل طلب صيانة</h3>
+              <h3 className="font-semibold text-gray-900 dark:text-white">تحويل الى موظف</h3>
               <button
                 type="button"
                 onClick={() => setConvertRequest(null)}

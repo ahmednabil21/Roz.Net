@@ -152,6 +152,8 @@ export function getPageActions(user: User | null | undefined, page: string): str
   return set?.actions ?? [];
 }
 
+const MAINTENANCE_WORKFLOW_ACTIONS = ['accept', 'reject', 'reply', 'convert', 'complete'] as const;
+
 export function hasPageAction(
   user: User | null | undefined,
   page: string,
@@ -159,7 +161,22 @@ export function hasPageAction(
 ): boolean {
   if (!user || user.role !== UserRole.Employee) return true;
   if (usesPagePermissions(user)) {
-    return getPageActions(user, page).includes(action);
+    const actions = getPageActions(user, page);
+    if (actions.includes(action)) return true;
+
+    // MaintenanceRequests: older employees often have only "view" after granular
+    // workflow actions were added. If no accept/reject/reply/convert is stored,
+    // treat page access as full workflow access (matches legacy behavior).
+    if (
+      page === 'MaintenanceRequests' &&
+      (MAINTENANCE_WORKFLOW_ACTIONS as readonly string[]).includes(action) &&
+      actions.includes('view') &&
+      !MAINTENANCE_WORKFLOW_ACTIONS.some((a) => actions.includes(a))
+    ) {
+      return true;
+    }
+
+    return false;
   }
   return hasLegacyPageAction(user, page, action);
 }
@@ -189,7 +206,8 @@ function hasLegacyPageAction(user: User, page: string, action: string): boolean 
         action === 'accept' ||
         action === 'reject' ||
         action === 'reply' ||
-        action === 'convert'
+        action === 'convert' ||
+        action === 'complete'
       );
     case 'Activations':
       if (action === 'view' || action === 'print') return !!user.canAccessInvoices;
@@ -235,7 +253,7 @@ function hasLegacyAnyPageAction(user: User, page: string): boolean {
   const catalogActions: Record<string, string[]> = {
     Dashboard: ['view'],
     Subscribers: ['view', 'add', 'edit', 'delete', 'activate', 'details', 'sync'],
-    MaintenanceRequests: ['view', 'accept', 'reject', 'reply', 'convert'],
+    MaintenanceRequests: ['view', 'accept', 'reject', 'reply', 'convert', 'complete'],
     Activations: ['view', 'print', 'delete'],
     Debts: ['view', 'add', 'edit', 'delete', 'pay'],
     Accounts: ['view', 'delete'],
