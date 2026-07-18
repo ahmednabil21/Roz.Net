@@ -153,6 +153,14 @@ export function getPageActions(user: User | null | undefined, page: string): str
 }
 
 const MAINTENANCE_WORKFLOW_ACTIONS = ['accept', 'reject', 'reply', 'convert', 'complete'] as const;
+const EMPLOYEE_TASK_MGMT_ACTIONS = ['manageEmployeeTasks', 'addTask', 'editTask', 'deleteTask'] as const;
+
+/** موظف يدير المهام (أعلام قديمة أو صلاحيات EmployeeManagement). */
+function employeeHasTaskManagementCapability(user: User): boolean {
+  if (user.canManageEmployeeTasks) return true;
+  const actions = getPageActions(user, 'EmployeeManagement');
+  return EMPLOYEE_TASK_MGMT_ACTIONS.some((a) => actions.includes(a));
+}
 
 export function hasPageAction(
   user: User | null | undefined,
@@ -164,14 +172,14 @@ export function hasPageAction(
     const actions = getPageActions(user, page);
     if (actions.includes(action)) return true;
 
-    // MaintenanceRequests: older employees often have only "view" after granular
-    // workflow actions were added. If no accept/reject/reply/convert is stored,
-    // treat page access as full workflow access (matches legacy behavior).
+    // MaintenanceRequests: employees with task-management rights should get the
+    // same post-accept workflow as the agent (convert / reply / complete), even
+    // when pagePermissions only list view/accept.
     if (
       page === 'MaintenanceRequests' &&
       (MAINTENANCE_WORKFLOW_ACTIONS as readonly string[]).includes(action) &&
-      actions.includes('view') &&
-      !MAINTENANCE_WORKFLOW_ACTIONS.some((a) => actions.includes(a))
+      actions.length > 0 &&
+      employeeHasTaskManagementCapability(user)
     ) {
       return true;
     }
