@@ -162,6 +162,7 @@ function employeeHasTaskManagementCapability(user: User): boolean {
   return EMPLOYEE_TASK_MGMT_ACTIONS.some((a) => actions.includes(a));
 }
 
+
 export function hasPageAction(
   user: User | null | undefined,
   page: string,

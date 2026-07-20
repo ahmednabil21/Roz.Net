@@ -2418,10 +2418,49 @@ class ApiService {
     status?: number;
     agentId?: string;
     subscriberName?: string;
-  }): Promise<AgentSubscriberMaintenanceRequestDto[]> {
+    page?: number;
+    pageSize?: number;
+  }): Promise<PaginatedResponse<AgentSubscriberMaintenanceRequestDto>> {
     const response = await this.api.get<unknown>('/SubscriberMaintenanceRequests/agent', { params });
-    const list = Array.isArray(response.data) ? response.data : [];
-    return list.map((item) => this.normalizeAgentSubscriberMaintenanceRequest(item));
+    const data = response.data;
+
+    if (Array.isArray(data)) {
+      const list = data.map((item) => this.normalizeAgentSubscriberMaintenanceRequest(item));
+      const total = list.length;
+      return {
+        data: list,
+        currentPage: 1,
+        pageSize: total || 10,
+        totalItems: total,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+        totalCount: total,
+        pageNumber: 1,
+      };
+    }
+
+    const raw = (data ?? {}) as Record<string, unknown>;
+    const rawList = (raw.data ?? raw.Data ?? []) as unknown[];
+    const list = Array.isArray(rawList)
+      ? rawList.map((item) => this.normalizeAgentSubscriberMaintenanceRequest(item))
+      : [];
+    const totalItems = Number(raw.totalItems ?? raw.TotalItems ?? raw.totalCount ?? list.length) || 0;
+    const currentPage = Number(raw.currentPage ?? raw.CurrentPage ?? raw.pageNumber ?? params?.page ?? 1) || 1;
+    const pageSize = Number(raw.pageSize ?? raw.PageSize ?? params?.pageSize ?? 10) || 10;
+    const totalPages = Number(raw.totalPages ?? raw.TotalPages ?? Math.max(1, Math.ceil(totalItems / pageSize))) || 1;
+
+    return {
+      data: list,
+      currentPage,
+      pageSize,
+      totalItems,
+      totalPages,
+      hasNextPage: Boolean(raw.hasNextPage ?? raw.HasNextPage ?? currentPage < totalPages),
+      hasPreviousPage: Boolean(raw.hasPreviousPage ?? raw.HasPreviousPage ?? currentPage > 1),
+      totalCount: totalItems,
+      pageNumber: currentPage,
+    };
   }
 
   /** قبول طلب صيانة — POST /SubscriberMaintenanceRequests/{id}/accept */

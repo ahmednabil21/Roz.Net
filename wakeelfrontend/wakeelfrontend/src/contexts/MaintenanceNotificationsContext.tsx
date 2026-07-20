@@ -38,18 +38,22 @@ async function fetchPendingMaintenanceCount(isAdmin: boolean, agentIds: string[]
           .getAgentSubscriberMaintenanceRequests({
             status: SubscriberMaintenanceRequestStatusCode.Pending,
             agentId,
+            page: 1,
+            pageSize: 1,
           })
-          .then((list) => list.length)
+          .then((res) => res.totalItems ?? 0)
           .catch(() => 0)
       )
     );
     return counts.reduce((sum, n) => sum + n, 0);
   }
 
-  const list = await apiService.getAgentSubscriberMaintenanceRequests({
+  const res = await apiService.getAgentSubscriberMaintenanceRequests({
     status: SubscriberMaintenanceRequestStatusCode.Pending,
+    page: 1,
+    pageSize: 1,
   });
-  return list.length;
+  return res.totalItems ?? 0;
 }
 
 interface MaintenanceNotificationsContextType {

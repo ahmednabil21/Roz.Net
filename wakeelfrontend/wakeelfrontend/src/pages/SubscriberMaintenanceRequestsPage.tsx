@@ -5,10 +5,12 @@ import { useMaintenanceNotifications } from '../contexts/MaintenanceNotification
 import { useDigits } from '../contexts/DigitsContext';
 import { apiService } from '../services/api';
 import { hasPageAction } from '../utils/employeePermissions';
+import Pagination from '../components/Pagination';
 import {
   AgentSubscriberMaintenanceRequestDto,
   EmployeeTaskCreateRequest,
   EmployeeTaskType,
+  PaginatedResponse,
   SubscriberAppProblemType,
   SubscriberMaintenanceKind,
   SubscriberMaintenanceRequestStatusCode,
@@ -85,8 +87,21 @@ const mapProblemTypeToMaintenanceKind = (problemType: number): SubscriberMainten
   }
 };
 
-const maintenanceQueryKey = (status: '' | number, agentId?: string, subscriberName?: string) =>
-  ['agent-subscriber-maintenance', status === '' ? null : status, agentId ?? null, subscriberName ?? null] as const;
+const maintenanceQueryKey = (
+  status: '' | number,
+  agentId?: string,
+  subscriberName?: string,
+  page?: number,
+  pageSize?: number
+) =>
+  [
+    'agent-subscriber-maintenance',
+    status === '' ? null : status,
+    agentId ?? null,
+    subscriberName ?? null,
+    page ?? 1,
+    pageSize ?? 10,
+  ] as const;
 
 const matchesStatusFilter = (req: AgentSubscriberMaintenanceRequestDto, status: '' | number) =>
   status === '' || Number(req.status) === status;
@@ -114,7 +129,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const { user } = useAuth();
   const { formatDate } = useDigits();
   const queryClient = useQueryClient();
-  const { markAsRead, refreshPendingCount } = useMaintenanceNotifications();
+  const { markAsRead, refreshPendingCount, pendingCount } = useMaintenanceNotifications();
   const isAdmin = user?.role === UserRole.Admin;
   const isEmployee = user?.role === UserRole.Employee;
 
@@ -127,6 +142,8 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'' | SubscriberMaintenanceRequestStatusCode>('');
   const [subscriberNameSearch, setSubscriberNameSearch] = useState('');
   const [debouncedSubscriberName, setDebouncedSubscriberName] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -162,6 +179,10 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   useEffect(() => {
     markAsRead();
   }, [markAsRead]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, selectedAgentId, pageSize, debouncedSubscriberName]);
 
   const { data: agentsResponse } = useQuery({
     queryKey: ['agents-for-maintenance', 1, 100],
@@ -199,15 +220,30 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
       status: statusFilter === '' ? undefined : statusFilter,
       agentId: isAdmin ? effectiveAgentId || undefined : undefined,
       subscriberName: debouncedSubscriberName || undefined,
+      page,
+      pageSize,
     }),
-    [statusFilter, isAdmin, effectiveAgentId, debouncedSubscriberName]
+    [statusFilter, isAdmin, effectiveAgentId, debouncedSubscriberName, page, pageSize]
   );
 
-  const { data: requests = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: maintenanceQueryKey(statusFilter, queryParams.agentId, queryParams.subscriberName),
+  const { data: requestsResponse, isLoading, refetch, isFetching } = useQuery({
+    queryKey: maintenanceQueryKey(
+      statusFilter,
+      queryParams.agentId,
+      queryParams.subscriberName,
+      page,
+      pageSize
+    ),
     queryFn: () => apiService.getAgentSubscriberMaintenanceRequests(queryParams),
     enabled: canLoadData,
   });
+
+  const requests = requestsResponse?.data ?? [];
+  const currentPage = requestsResponse?.currentPage ?? page;
+  const totalPages = requestsResponse?.totalPages ?? 1;
+  const totalItems = requestsResponse?.totalItems ?? 0;
+  const hasNextPage = requestsResponse?.hasNextPage ?? currentPage < totalPages;
+  const hasPreviousPage = requestsResponse?.hasPreviousPage ?? currentPage > 1;
 
   const { data: myEmployees = [] } = useQuery<User[]>({
     queryKey: ['my-employees-for-maintenance-convert'],
@@ -225,25 +261,52 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
 
   const upsertRequestInCache = useCallback(
     (request: AgentSubscriberMaintenanceRequestDto) => {
-      queryClient.setQueriesData<AgentSubscriberMaintenanceRequestDto[]>(
+      queryClient.setQueriesData<PaginatedResponse<AgentSubscriberMaintenanceRequestDto>>(
         { queryKey: ['agent-subscriber-maintenance'] },
         (old) => {
-          if (!old) return old;
+          if (!old?.data) return old;
           const filter = statusFilterRef.current;
           const nameFilter = subscriberNameFilterRef.current;
           const matchesFilters =
             matchesStatusFilter(request, filter) && matchesSubscriberNameFilter(request, nameFilter);
-          const idx = old.findIndex((r) => r.id === request.id);
+          const idx = old.data.findIndex((r) => r.id === request.id);
+          const pageSizeValue = old.pageSize || 10;
+          const current = old.currentPage ?? old.pageNumber ?? 1;
+
           if (idx >= 0) {
             if (!matchesFilters) {
-              return old.filter((r) => r.id !== request.id);
+              const nextData = old.data.filter((r) => r.id !== request.id);
+              const newTotalItems = Math.max(0, (old.totalItems ?? old.data.length) - 1);
+              const newTotalPages = Math.max(1, Math.ceil(newTotalItems / pageSizeValue) || 1);
+              return {
+                ...old,
+                data: nextData,
+                totalItems: newTotalItems,
+                totalCount: newTotalItems,
+                totalPages: newTotalPages,
+                hasNextPage: current < newTotalPages,
+                hasPreviousPage: current > 1,
+              };
             }
-            const next = [...old];
-            next[idx] = request;
-            return next;
+            const nextData = [...old.data];
+            nextData[idx] = request;
+            return { ...old, data: nextData };
           }
-          if (!matchesFilters) return old;
-          return [request, ...old];
+
+          if (!matchesFilters || current !== 1) return old;
+
+          const nextData = [request, ...old.data].slice(0, pageSizeValue);
+          const newTotalItems = (old.totalItems ?? old.data.length) + 1;
+          const newTotalPages = Math.max(1, Math.ceil(newTotalItems / pageSizeValue));
+          return {
+            ...old,
+            data: nextData,
+            totalItems: newTotalItems,
+            totalCount: newTotalItems,
+            totalPages: newTotalPages,
+            hasNextPage: current < newTotalPages,
+            hasPreviousPage: current > 1,
+          };
         }
       );
     },
@@ -370,10 +433,6 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
       taskType: EmployeeTaskType.SubscriberMaintenance,
     });
   };
-
-  const pendingCount = requests.filter(
-    (r) => Number(r.status) === SubscriberMaintenanceRequestStatusCode.Pending
-  ).length;
 
   const noteBusy = rejectMutation.isPending || replyMutation.isPending || completeMutation.isPending;
 
@@ -629,6 +688,23 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+        )}
+
+        {canLoadData && !isLoading && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.max(1, totalPages)}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            hasNextPage={hasNextPage}
+            hasPreviousPage={hasPreviousPage}
+            onPageChange={setPage}
+            pageSizeOptions={[10, 20, 50]}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
         )}
       </div>
 
