@@ -1,33 +1,44 @@
-.DS_Store
-*.log
-
 # Dependencies
 node_modules/
+/.pnp
+.pnp.js
 
 # Testing
 /coverage
 
 # Production
 /build
-wakeelfrontend/build/
 
-# Env / secrets
+# Misc
+.DS_Store
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-wakeelfrontend/.env.local
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# IDE / OS
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# OS
 Thumbs.db
-Untitled

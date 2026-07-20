@@ -2417,6 +2417,7 @@ class ApiService {
   async getAgentSubscriberMaintenanceRequests(params?: {
     status?: number;
     agentId?: string;
+    subscriberName?: string;
   }): Promise<AgentSubscriberMaintenanceRequestDto[]> {
     const response = await this.api.get<unknown>('/SubscriberMaintenanceRequests/agent', { params });
     const list = Array.isArray(response.data) ? response.data : [];

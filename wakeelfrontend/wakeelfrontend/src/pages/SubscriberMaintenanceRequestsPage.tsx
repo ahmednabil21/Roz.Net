@@ -85,11 +85,25 @@ const mapProblemTypeToMaintenanceKind = (problemType: number): SubscriberMainten
   }
 };
 
-const maintenanceQueryKey = (status: '' | number, agentId?: string) =>
-  ['agent-subscriber-maintenance', status === '' ? null : status, agentId ?? null] as const;
+const maintenanceQueryKey = (status: '' | number, agentId?: string, subscriberName?: string) =>
+  ['agent-subscriber-maintenance', status === '' ? null : status, agentId ?? null, subscriberName ?? null] as const;
 
 const matchesStatusFilter = (req: AgentSubscriberMaintenanceRequestDto, status: '' | number) =>
   status === '' || Number(req.status) === status;
+
+const matchesSubscriberNameFilter = (req: AgentSubscriberMaintenanceRequestDto, subscriberName: string) => {
+  const term = subscriberName.trim().toLowerCase();
+  if (!term) return true;
+  const haystack = [
+    req.subscriberFullName,
+    req.subscriberUsername,
+    req.subscriberPhoneNumber,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(term);
+};
 
 const actionBtnBase =
   'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm';
@@ -111,6 +125,8 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   const canComplete = !isEmployee || hasPageAction(user, 'MaintenanceRequests', 'complete');
 
   const [statusFilter, setStatusFilter] = useState<'' | SubscriberMaintenanceRequestStatusCode>('');
+  const [subscriberNameSearch, setSubscriberNameSearch] = useState('');
+  const [debouncedSubscriberName, setDebouncedSubscriberName] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -130,6 +146,18 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
   useEffect(() => {
     statusFilterRef.current = statusFilter;
   }, [statusFilter]);
+
+  const subscriberNameFilterRef = useRef(debouncedSubscriberName);
+  useEffect(() => {
+    subscriberNameFilterRef.current = debouncedSubscriberName;
+  }, [debouncedSubscriberName]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSubscriberName(subscriberNameSearch.trim());
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [subscriberNameSearch]);
 
   useEffect(() => {
     markAsRead();
@@ -170,12 +198,13 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
     () => ({
       status: statusFilter === '' ? undefined : statusFilter,
       agentId: isAdmin ? effectiveAgentId || undefined : undefined,
+      subscriberName: debouncedSubscriberName || undefined,
     }),
-    [statusFilter, isAdmin, effectiveAgentId]
+    [statusFilter, isAdmin, effectiveAgentId, debouncedSubscriberName]
   );
 
   const { data: requests = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: maintenanceQueryKey(statusFilter, queryParams.agentId),
+    queryKey: maintenanceQueryKey(statusFilter, queryParams.agentId, queryParams.subscriberName),
     queryFn: () => apiService.getAgentSubscriberMaintenanceRequests(queryParams),
     enabled: canLoadData,
   });
@@ -201,16 +230,19 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         (old) => {
           if (!old) return old;
           const filter = statusFilterRef.current;
+          const nameFilter = subscriberNameFilterRef.current;
+          const matchesFilters =
+            matchesStatusFilter(request, filter) && matchesSubscriberNameFilter(request, nameFilter);
           const idx = old.findIndex((r) => r.id === request.id);
           if (idx >= 0) {
-            if (!matchesStatusFilter(request, filter)) {
+            if (!matchesFilters) {
               return old.filter((r) => r.id !== request.id);
             }
             const next = [...old];
             next[idx] = request;
             return next;
           }
-          if (!matchesStatusFilter(request, filter)) return old;
+          if (!matchesFilters) return old;
           return [request, ...old];
         }
       );
@@ -370,7 +402,7 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           {isAdmin && (
             <select
               value={selectedAgentId}
@@ -385,6 +417,13 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
               ))}
             </select>
           )}
+          <input
+            type="text"
+            value={subscriberNameSearch}
+            onChange={(e) => setSubscriberNameSearch(e.target.value)}
+            placeholder="بحث باسم المشترك..."
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+          />
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -413,7 +452,9 @@ const SubscriberMaintenanceRequestsPage: React.FC = () => {
         ) : isLoading ? (
           <div className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">جاري التحميل...</div>
         ) : requests.length === 0 ? (
-          <div className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">لا توجد طلبات صيانة.</div>
+          <div className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+            {debouncedSubscriberName ? 'لا توجد طلبات مطابقة لاسم المشترك.' : 'لا توجد طلبات صيانة.'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1100px] w-full divide-y divide-gray-200 dark:divide-gray-700">

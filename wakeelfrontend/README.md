@@ -1,52 +1,52 @@
-# isp-iq
+# Solid-Sys
 
-# نظام إدارة الوكيل - Wakeel Management System
+واجهة نظام الوكيل (React + TypeScript) — Alwakeel Frontend.
 
-نظام إدارة شامل لخدمات الإنترنت والاشتراكات
-
-## الميزات الرئيسية
-
-- **لوحة التحكم**: إحصائيات شاملة للمشتركين والاشتراكات
-- **إدارة المشتركين**: إضافة، تعديل، حذف، وتجديد المشتركين
-- **إدارة الباقات**: إنشاء وإدارة باقات الإنترنت المختلفة
-- **الفواتير**: عرض وإدارة فواتير التجديد والتفعيل
-- **التقارير**: تقارير مفصلة عن الإيرادات والمشتركين
-- **إدارة المستخدمين**: إدارة المستخدمين والصلاحيات
-- **الإعدادات**: إعدادات النظام العامة
-- **معلومات المشترك**: صفحة منفصلة لعرض معلومات المشترك
-
-## التقنيات المستخدمة
-
-- **Frontend**: React 19 + TypeScript
-- **Styling**: Tailwind CSS
-- **State Management**: React Query
-- **HTTP Client**: Axios
-- **Icons**: Lucide React
-- **Font**: Cairo (Arabic)
-
-## التثبيت والتشغيل
+## تشغيل المشروع
 
 ```bash
-# تثبيت التبعيات
+cd wakeelfrontend
 npm install
-
-# تشغيل التطبيق في وضع التطوير
 npm start
-
-# بناء التطبيق للإنتاج
-npm run build
 ```
 
-## المتطلبات
+يفتح على: http://localhost:3000/wakeel
 
-- Node.js 16+
-- npm أو yarn
+## ربط الـ API
 
-## الروابط
+الفرونت يتصل بـ:
 
-- **النظام الرئيسي**: [Wakeel Management System](https://github.com/ahmednabil21/wakeel.git)
-- **صفحة معلومات المشترك**: [Subscriber Info App](https://github.com/ahmednabil21/info_wakeel.git)
+`https://api-solid.execute-iq.com/wakeel/api`
 
-## الترخيص
+(الوثائق: https://api-solid.execute-iq.com/swagger)
 
-© 2024 نظام الوكيل. جميع الحقوق محفوظة.# Roz.Net
+أنشئ `wakeelfrontend/.env.local`:
+
+```
+REACT_APP_API_URL=https://api-solid.execute-iq.com/wakeel/api
+```
+
+بعد تغيير `.env.local` أعد تشغيل `npm start`.
+
+## النشر على Vercel (GitHub Actions)
+
+`.github/workflows/vercel-deploy.yml`
+
+### إعداد الأسرار في GitHub
+
+في **ahmednabil21/Solid-Sys** → **Settings** → **Secrets and variables** → **Actions**:
+
+| Secret | من أين تحصل عليه |
+|--------|------------------|
+| `VERCEL_TOKEN` | [vercel.com/account/tokens](https://vercel.com/account/tokens) → Create Token |
+| `VERCEL_ORG_ID` | مشروع solid-system → Settings → General → **Team ID** |
+| `VERCEL_PROJECT_ID` | نفس الصفحة → **Project ID** |
+
+بعد إضافة الأسرار، أي `git push` على `main` ينشر تلقائياً إلى مشروع **solid-system**.
+
+### إعداد Vercel (ربط Git مباشر)
+
+عند ربط `ahmednabil21/Solid-Sys` في Vercel:
+
+- **Root Directory:** اتركه فارغاً (`.`) — ملف `vercel.json` في الجذر يوجّه البناء إلى `wakeelfrontend/`
+- **Environment Variable:** `REACT_APP_API_URL` = `https://api-solid.execute-iq.com/wakeel/api`
