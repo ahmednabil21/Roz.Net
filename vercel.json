@@ -1,7 +1,7 @@
 {
-  "installCommand": "npm ci --prefix wakeelfrontend",
-  "buildCommand": "npm run build --prefix wakeelfrontend",
-  "outputDirectory": "wakeelfrontend/build",
+  "installCommand": "npm ci --prefix wakeelfrontend/wakeelfrontend",
+  "buildCommand": "npm run build --prefix wakeelfrontend/wakeelfrontend",
+  "outputDirectory": "wakeelfrontend/wakeelfrontend/build",
   "redirects": [
     {
       "source": "/",

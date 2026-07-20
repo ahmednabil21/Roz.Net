@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: wakeelfrontend
+        working-directory: wakeelfrontend/wakeelfrontend
 
     steps:
       - name: Validate required secrets
@@ -46,7 +46,7 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: wakeelfrontend/package-lock.json
+          cache-dependency-path: wakeelfrontend/wakeelfrontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
