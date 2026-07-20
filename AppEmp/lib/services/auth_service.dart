@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -20,7 +21,12 @@ class AuthService {
   AuthService({FlutterSecureStorage? storage})
       : _storage = storage ??
             const FlutterSecureStorage(
-              // تثبيت تخزين الويب حتى لا يضيع JWT بين الجلسات/التبويبات
+              aOptions: AndroidOptions(
+                encryptedSharedPreferences: true,
+              ),
+              iOptions: IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock_this_device,
+              ),
               webOptions: WebOptions(
                 dbName: 'roz_emp_secure',
                 publicKey: 'roz_emp_key',
@@ -35,7 +41,44 @@ class AuthService {
 
   final FlutterSecureStorage _storage;
 
-  Future<String?> getToken() => _storage.read(key: _tokenKey);
+  String? _cachedToken;
+  bool _storageLoaded = false;
+  VoidCallback? onSessionExpired;
+
+  Future<void> _loadTokenFromStorage({int retries = 4}) async {
+    for (var i = 0; i < retries; i++) {
+      try {
+        _cachedToken = await _storage.read(key: _tokenKey);
+      } catch (e) {
+        debugPrint('AuthService: secure storage read failed: $e');
+        _cachedToken = null;
+      }
+      if (_cachedToken != null && _cachedToken!.isNotEmpty) {
+        _storageLoaded = true;
+        return;
+      }
+      if (i < retries - 1) {
+        await Future<void>.delayed(Duration(milliseconds: 100 * (i + 1)));
+      }
+    }
+    _storageLoaded = true;
+  }
+
+  Future<String?> getToken() async {
+    if (_cachedToken != null && _cachedToken!.isNotEmpty) {
+      return _cachedToken;
+    }
+    if (!_storageLoaded) {
+      await _loadTokenFromStorage();
+    } else {
+      try {
+        _cachedToken = await _storage.read(key: _tokenKey);
+      } catch (e) {
+        debugPrint('AuthService: token re-read failed: $e');
+      }
+    }
+    return _cachedToken;
+  }
 
   Future<String?> getFullName() => _storage.read(key: _nameKey);
 
@@ -54,6 +97,35 @@ class AuthService {
   Future<bool> isLoggedIn() async {
     final t = await getToken();
     return t != null && t.isNotEmpty;
+  }
+
+  /// يستعيد الجلسة من التخزين الآمن ويتحقق من صلاحية التوكن عند توفر الشبكة.
+  Future<bool> restoreSession() async {
+    await _loadTokenFromStorage();
+    if (_cachedToken == null || _cachedToken!.isEmpty) return false;
+
+    try {
+      final res = await http
+          .get(
+            Uri.parse('${ApiConfig.baseUrl}/Auth/me'),
+            headers: await authHeaders(),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (res.statusCode == 200) {
+        await _saveProfileFromBody(_tryDecode(res.body));
+        return true;
+      }
+      if (res.statusCode == 401) {
+        await logout();
+        return false;
+      }
+      // خطأ مؤقت من الخادم — نُبقي الجلسة المحفوظة.
+      return true;
+    } catch (e) {
+      debugPrint('AuthService: restoreSession offline/error: $e');
+      return true;
+    }
   }
 
   Future<LoginResult> login(String username, String password) async {
@@ -82,13 +154,14 @@ class AuthService {
       throw ApiException('هذا التطبيق مخصص لدور الموظف فقط.');
     }
 
+    _cachedToken = result.token;
+    _storageLoaded = true;
     await _storage.write(key: _tokenKey, value: result.token);
     await _storage.write(key: _nameKey, value: result.fullName ?? '');
     await _storage.write(key: _usernameKey, value: result.username ?? username.trim());
     await _storage.write(key: _companyKey, value: result.companyName ?? '');
     await _storage.write(key: _roleKey, value: result.role ?? 'Employee');
 
-    // حدّث من /Auth/me عند الحاجة (الاسم / الشركة)
     await _refreshProfileFromMe();
     return result;
   }
@@ -98,29 +171,39 @@ class AuthService {
       final headers = await authHeaders();
       final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/Auth/me'), headers: headers);
       if (res.statusCode != 200) return;
-      final body = _tryDecode(res.body);
-      if (body == null) return;
-      final fullName = (body['fullName'] ?? body['FullName'])?.toString();
-      final username = (body['username'] ?? body['Username'])?.toString();
-      final company = (body['companyName'] ?? body['CompanyName'])?.toString();
-      if (fullName != null && fullName.isNotEmpty) {
-        await _storage.write(key: _nameKey, value: fullName);
-      }
-      if (username != null && username.isNotEmpty) {
-        await _storage.write(key: _usernameKey, value: username);
-      }
-      if (company != null && company.isNotEmpty) {
-        await _storage.write(key: _companyKey, value: company);
-      }
+      await _saveProfileFromBody(_tryDecode(res.body));
     } catch (_) {}
   }
 
+  Future<void> _saveProfileFromBody(Map<String, dynamic>? body) async {
+    if (body == null) return;
+    final fullName = (body['fullName'] ?? body['FullName'])?.toString();
+    final username = (body['username'] ?? body['Username'])?.toString();
+    final company = (body['companyName'] ?? body['CompanyName'])?.toString();
+    if (fullName != null && fullName.isNotEmpty) {
+      await _storage.write(key: _nameKey, value: fullName);
+    }
+    if (username != null && username.isNotEmpty) {
+      await _storage.write(key: _usernameKey, value: username);
+    }
+    if (company != null && company.isNotEmpty) {
+      await _storage.write(key: _companyKey, value: company);
+    }
+  }
+
   Future<void> logout() async {
+    _cachedToken = null;
+    _storageLoaded = false;
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _nameKey);
     await _storage.delete(key: _usernameKey);
     await _storage.delete(key: _companyKey);
     await _storage.delete(key: _roleKey);
+  }
+
+  Future<void> handleUnauthorized() async {
+    await logout();
+    onSessionExpired?.call();
   }
 
   Future<Map<String, String>> authHeaders() async {

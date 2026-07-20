@@ -4,7 +4,6 @@ import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../services/realtime_service.dart';
 import '../theme/app_theme.dart';
-import 'home_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -12,11 +11,13 @@ class LoginScreen extends StatefulWidget {
     required this.auth,
     required this.fcm,
     required this.realtime,
+    required this.onLoggedIn,
   });
 
   final AuthService auth;
   final FcmService fcm;
   final RealtimeService realtime;
+  final VoidCallback onLoggedIn;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -48,15 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await widget.fcm.registerTokenWithBackend();
       await widget.realtime.connect();
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => HomeShell(
-            auth: widget.auth,
-            fcm: widget.fcm,
-            realtime: widget.realtime,
-          ),
-        ),
-      );
+      widget.onLoggedIn();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {

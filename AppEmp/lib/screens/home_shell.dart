@@ -13,11 +13,13 @@ class HomeShell extends StatefulWidget {
     required this.auth,
     required this.fcm,
     required this.realtime,
+    required this.onLoggedOut,
   });
 
   final AuthService auth;
   final FcmService fcm;
   final RealtimeService realtime;
+  final VoidCallback onLoggedOut;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -83,6 +85,7 @@ class _HomeShellState extends State<HomeShell> {
         auth: widget.auth,
         fcm: widget.fcm,
         realtime: widget.realtime,
+        onLoggedOut: widget.onLoggedOut,
       ),
     ];
 

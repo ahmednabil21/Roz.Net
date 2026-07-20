@@ -6,7 +6,6 @@ import '../services/fcm_service.dart';
 import '../services/realtime_service.dart';
 import '../services/telegram_service.dart';
 import '../theme/app_theme.dart';
-import 'login_screen.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -14,11 +13,13 @@ class SettingsPage extends StatefulWidget {
     required this.auth,
     required this.fcm,
     required this.realtime,
+    required this.onLoggedOut,
   });
 
   final AuthService auth;
   final FcmService fcm;
   final RealtimeService realtime;
+  final VoidCallback onLoggedOut;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -267,16 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
     await widget.realtime.disconnect();
     await widget.auth.logout();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(
-          auth: widget.auth,
-          fcm: widget.fcm,
-          realtime: widget.realtime,
-        ),
-      ),
-      (_) => false,
-    );
+    widget.onLoggedOut();
   }
 
   @override

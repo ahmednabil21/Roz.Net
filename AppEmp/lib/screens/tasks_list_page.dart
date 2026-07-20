@@ -75,6 +75,10 @@ class _TasksListPageState extends State<TasksListPage> {
       });
     } on ApiException catch (e) {
       if (!mounted) return;
+      if (e.statusCode == 401) {
+        await widget.auth.handleUnauthorized();
+        return;
+      }
       setState(() {
         _error = e.message;
         _loading = false;

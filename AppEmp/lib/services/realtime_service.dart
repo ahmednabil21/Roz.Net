@@ -56,7 +56,7 @@ class RealtimeService {
         .withUrl(
           ApiConfig.hubUrl,
           options: HttpConnectionOptions(
-            accessTokenFactory: () async => token,
+            accessTokenFactory: () async => (await _auth.getToken()) ?? '',
           ),
         )
         .withAutomaticReconnect()

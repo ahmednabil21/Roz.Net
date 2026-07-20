@@ -69,6 +69,7 @@ const SUBSCRIBERS_TABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'note', label: 'الملاحظات' },
   { id: 'profile', label: 'الباقة' },
   { id: 'paymentMethod', label: 'طريقة الدفع' },
+  { id: 'totalDebt', label: 'دين المشترك' },
   { id: 'activationDate', label: 'تاريخ التفعيل' },
   { id: 'expirationDate', label: 'تاريخ الانتهاء' },
   { id: 'status', label: 'الحالة' },
@@ -4035,6 +4036,9 @@ const SubscribersPage: React.FC = () => {
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('paymentMethod')}`}>
                   طريقة الدفع
                 </th>
+                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('totalDebt')}`}>
+                  دين المشترك
+                </th>
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('activationDate')}`}>
                   تاريخ التفعيل
                 </th>
@@ -4132,6 +4136,15 @@ const SubscribersPage: React.FC = () => {
                   </td>
                   <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('paymentMethod')}`}>
                     {formatPaymentMethodLabel(subscriber.paymentMethod)}
+                  </td>
+                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm ${col('totalDebt')}`}>
+                    {(subscriber.totalDebt || 0) > 0 ? (
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {formatNumber(subscriber.totalDebt || 0, { suffix: ' د.ع' })}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-600 dark:text-emerald-400">لا يوجد دين</span>
+                    )}
                   </td>
                   <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('activationDate')}`}>
                     {formatDate(subscriber.activationDate, { year: 'numeric', month: 'numeric', day: 'numeric' })}
