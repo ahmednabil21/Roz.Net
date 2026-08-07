@@ -112,6 +112,9 @@ const EmployeeTasksPage: React.FC = () => {
     amountReceived: undefined,
     taskTitle: '',
     note: '',
+    newSubscriberName: '',
+    newSubscriberPhone: '',
+    newSubscriberAddress: '',
   });
   const [completeForm, setCompleteForm] = useState<EmployeeTaskCompleteInstallationRequest>({
     subscriberName: '',
@@ -481,6 +484,9 @@ const EmployeeTasksPage: React.FC = () => {
         amountReceived: undefined,
         taskTitle: '',
         note: '',
+        newSubscriberName: '',
+        newSubscriberPhone: '',
+        newSubscriberAddress: '',
       });
       setAmountReceptionSubscriberIds([]);
       queryClient.invalidateQueries({ queryKey: ['employee-tasks'] });
@@ -497,8 +503,12 @@ const EmployeeTasksPage: React.FC = () => {
     if (empId) trimmed.employeeUserId = empId;
 
     if (payload.taskType === EmployeeTaskType.SubscriberInstallation) {
-      const subscriberId = payload.subscriberId?.trim();
-      if (subscriberId) trimmed.subscriberId = subscriberId;
+      const name = payload.newSubscriberName?.trim();
+      const phone = payload.newSubscriberPhone?.trim();
+      const address = payload.newSubscriberAddress?.trim();
+      if (name) trimmed.newSubscriberName = name;
+      if (phone) trimmed.newSubscriberPhone = phone;
+      if (address) trimmed.newSubscriberAddress = address;
       return trimmed;
     }
     if (payload.taskType === EmployeeTaskType.SubscriberMaintenance) {
@@ -610,11 +620,19 @@ const EmployeeTasksPage: React.FC = () => {
     /** استلام مبلغ عند الإنشاء: المشتركون من checkboxes → amountReceptionSubscriberIds وليس subscriberId */
     const skipGenericSubscriberCheck =
       payload.taskType === EmployeeTaskType.AmountReception && showCreateModal;
-    if (!payload.subscriberId?.trim() && payload.taskType !== EmployeeTaskType.Other && !skipGenericSubscriberCheck) {
+    const isInstallation = payload.taskType === EmployeeTaskType.SubscriberInstallation;
+    if (
+      !isInstallation &&
+      !payload.subscriberId?.trim() &&
+      payload.taskType !== EmployeeTaskType.Other &&
+      !skipGenericSubscriberCheck
+    ) {
       return 'اختر المشترك.';
     }
-    if (payload.taskType === EmployeeTaskType.SubscriberInstallation && !payload.subscriberId?.trim()) {
-      return 'تنصيب مشترك يتطلب SubscriberId.';
+    if (isInstallation) {
+      if (!payload.newSubscriberName?.trim()) return 'أدخل اسم المشترك الجديد.';
+      if (!payload.newSubscriberPhone?.trim()) return 'أدخل رقم هاتف المشترك الجديد.';
+      if (!payload.newSubscriberAddress?.trim()) return 'أدخل عنوان المشترك الجديد.';
     }
     if (payload.taskType === EmployeeTaskType.SubscriberMaintenance) {
       if (!payload.subscriberId?.trim()) return 'صيانة مشترك تتطلب SubscriberId.';
@@ -639,8 +657,9 @@ const EmployeeTasksPage: React.FC = () => {
     };
 
     if (payload.taskType === EmployeeTaskType.SubscriberInstallation) {
-      const subscriberId = payload.subscriberId?.trim();
-      if (subscriberId) trimmed.subscriberId = subscriberId;
+      trimmed.newSubscriberName = payload.newSubscriberName?.trim() || undefined;
+      trimmed.newSubscriberPhone = payload.newSubscriberPhone?.trim() || undefined;
+      trimmed.newSubscriberAddress = payload.newSubscriberAddress?.trim() || undefined;
       return trimmed;
     }
 
@@ -728,6 +747,9 @@ const EmployeeTasksPage: React.FC = () => {
                 amountReceived: undefined,
                 taskTitle: '',
                 note: '',
+                newSubscriberName: '',
+                newSubscriberPhone: '',
+                newSubscriberAddress: '',
               });
               setAmountReceptionSubscriberIds([]);
             }}
@@ -821,7 +843,7 @@ const EmployeeTasksPage: React.FC = () => {
 
                   <div className="mt-3 text-sm text-gray-700 dark:text-gray-300">
                     {task.taskType === EmployeeTaskType.SubscriberInstallation
-                      ? task.subscriberDisplayName || task.subscriberName || '—'
+                      ? task.newSubscriberName || task.subscriberDisplayName || task.subscriberName || '—'
                       : task.taskType === EmployeeTaskType.SubscriberMaintenance
                         ? maintenanceKindLabel(task.maintenanceType)
                         : task.taskType === EmployeeTaskType.AmountReception
@@ -872,8 +894,8 @@ const EmployeeTasksPage: React.FC = () => {
                           onClick={() => {
                             setSelectedTask(task);
                             setCompleteForm({
-                              subscriberName: task.subscriberName || '',
-                              subscriberPhone: task.subscriberPhone || '',
+                              subscriberName: task.newSubscriberName || task.subscriberName || '',
+                              subscriberPhone: task.newSubscriberPhone || task.subscriberPhone || '',
                               signalNumber: task.signalNumber || '',
                               note: task.note || '',
                             });
@@ -966,7 +988,7 @@ const EmployeeTasksPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
                         {task.taskType === EmployeeTaskType.SubscriberInstallation
-                          ? task.subscriberDisplayName || task.subscriberName || '—'
+                          ? task.newSubscriberName || task.subscriberDisplayName || task.subscriberName || '—'
                           : task.taskType === EmployeeTaskType.SubscriberMaintenance
                             ? maintenanceKindLabel(task.maintenanceType)
                             : task.taskType === EmployeeTaskType.AmountReception
@@ -1016,6 +1038,9 @@ const EmployeeTasksPage: React.FC = () => {
                                     amountReceived: task.amountReceived ?? undefined,
                                     taskTitle: task.taskTitle || '',
                                     note: task.note || '',
+                                    newSubscriberName: task.newSubscriberName || '',
+                                    newSubscriberPhone: task.newSubscriberPhone || '',
+                                    newSubscriberAddress: task.newSubscriberAddress || '',
                                   });
                                   setAmountReceptionSubscriberIds(task.subscriberId ? [task.subscriberId] : []);
                                   setShowEditModal(true);
@@ -1082,8 +1107,8 @@ const EmployeeTasksPage: React.FC = () => {
                                     onClick={() => {
                                       setSelectedTask(task);
                                       setCompleteForm({
-                                        subscriberName: task.subscriberName || '',
-                                        subscriberPhone: task.subscriberPhone || '',
+                                        subscriberName: task.newSubscriberName || task.subscriberName || '',
+                                        subscriberPhone: task.newSubscriberPhone || task.subscriberPhone || '',
                                         signalNumber: task.signalNumber || '',
                                         note: task.note || '',
                                       });
@@ -1208,6 +1233,9 @@ const EmployeeTasksPage: React.FC = () => {
                     maintenanceType: SubscriberMaintenanceKind.CableCut,
                     amountReceived: undefined,
                     taskTitle: '',
+                    newSubscriberName: '',
+                    newSubscriberPhone: '',
+                    newSubscriberAddress: '',
                   }));
                 }}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
@@ -1219,13 +1247,29 @@ const EmployeeTasksPage: React.FC = () => {
               </select>
 
               {createForm.taskType === EmployeeTaskType.SubscriberInstallation && (
-                <input
-                  type="text"
-                  value={createForm.subscriberId ?? ''}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, subscriberId: e.target.value }))}
-                  placeholder="اسم المشترك"
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
-                />
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={createForm.newSubscriberName ?? ''}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, newSubscriberName: e.target.value }))}
+                    placeholder="اسم المشترك الجديد *"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={createForm.newSubscriberPhone ?? ''}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, newSubscriberPhone: e.target.value }))}
+                    placeholder="رقم هاتف المشترك الجديد *"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={createForm.newSubscriberAddress ?? ''}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, newSubscriberAddress: e.target.value }))}
+                    placeholder="عنوان المشترك الجديد *"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
               )}
               {createForm.taskType === EmployeeTaskType.SubscriberMaintenance && (
                 <div className="space-y-2">
@@ -1718,9 +1762,28 @@ const EmployeeTasksPage: React.FC = () => {
               <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
                 <p className="text-gray-500 dark:text-gray-400">اسم المشترك</p>
                 <p className="text-gray-900 dark:text-white mt-1">
-                  {selectedTask.subscriberDisplayName || selectedTask.subscriberName || '—'}
+                  {selectedTask.newSubscriberName ||
+                    selectedTask.subscriberDisplayName ||
+                    selectedTask.subscriberName ||
+                    '—'}
                 </p>
               </div>
+              {selectedTask.taskType === EmployeeTaskType.SubscriberInstallation && (
+                <>
+                  <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                    <p className="text-gray-500 dark:text-gray-400">هاتف المشترك الجديد</p>
+                    <p className="text-gray-900 dark:text-white mt-1">
+                      {selectedTask.newSubscriberPhone || '—'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                    <p className="text-gray-500 dark:text-gray-400">عنوان المشترك الجديد</p>
+                    <p className="text-gray-900 dark:text-white mt-1">
+                      {selectedTask.newSubscriberAddress || '—'}
+                    </p>
+                  </div>
+                </>
+              )}
               <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
                 <p className="text-gray-500 dark:text-gray-400">ملاحظة المهمة</p>
                 <p className="text-gray-900 dark:text-white mt-1 whitespace-pre-wrap">

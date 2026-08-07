@@ -1381,6 +1381,10 @@ export interface EmployeeTask {
   subscriberName?: string | null;
   subscriberPhone?: string | null;
   subscriberDisplayName?: string | null;
+  /** بيانات المشترك الجديد عند TaskType = تنصيب */
+  newSubscriberName?: string | null;
+  newSubscriberPhone?: string | null;
+  newSubscriberAddress?: string | null;
   maintenanceType?: SubscriberMaintenanceKind | null;
   amountReceived?: number | null;
   materialId?: string | null;
@@ -1416,6 +1420,10 @@ export interface EmployeeTaskCreateRequest {
   /** تفاصيل إضافية (غالباً ما يقرأها الباكند مع دفعة المهام) */
   taskDetails?: string;
   note?: string;
+  /** مطلوب عند TaskType = تنصيب مشترك جديد */
+  newSubscriberName?: string;
+  newSubscriberPhone?: string;
+  newSubscriberAddress?: string;
 }
 
 /** استجابة POST /EmployeeTasks عند إرسال subscriberIds */
@@ -1433,6 +1441,9 @@ export interface EmployeeTaskUpdateRequest {
   amountReceived?: number;
   taskTitle?: string;
   note?: string;
+  newSubscriberName?: string;
+  newSubscriberPhone?: string;
+  newSubscriberAddress?: string;
 }
 
 export interface EmployeeTaskCompleteInstallationRequest {
