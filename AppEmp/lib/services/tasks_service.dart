@@ -62,56 +62,92 @@ class TasksService {
     }
   }
 
-  Future<void> completeMaintenance(String taskId, String note) async {
-    final headers = await _auth.authHeaders();
-    final res = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/EmployeeTasks/$taskId/complete-maintenance'),
-      headers: headers,
-      body: jsonEncode({'note': note}),
+  Future<void> completeMaintenance(String taskId, String note, {String? imagePath}) async {
+    await _postComplete(
+      '/EmployeeTasks/$taskId/complete-maintenance',
+      jsonBody: {'note': note},
+      formFields: {'note': note},
+      imagePath: imagePath,
+      errorFallback: 'فشل إكمال الصيانة',
     );
-    if (res.statusCode != 200) {
-      final body = _decode(res.body);
-      throw ApiException(_msg(body) ?? 'فشل إكمال الصيانة', statusCode: res.statusCode);
-    }
   }
 
   Future<void> completeInstallation({
     required String taskId,
     required double amountReceived,
     String? note,
+    String? imagePath,
   }) async {
-    final headers = await _auth.authHeaders();
-    final res = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/EmployeeTasks/$taskId/complete-installation'),
-      headers: headers,
-      body: jsonEncode({
-        'amountReceived': amountReceived,
-        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-      }),
+    final json = <String, dynamic>{
+      'amountReceived': amountReceived,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    };
+    final fields = <String, String>{
+      'amountReceived': amountReceived.toString(),
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    };
+    await _postComplete(
+      '/EmployeeTasks/$taskId/complete-installation',
+      jsonBody: json,
+      formFields: fields,
+      imagePath: imagePath,
+      errorFallback: 'فشل إكمال التنصيب',
     );
-    if (res.statusCode != 200) {
-      final body = _decode(res.body);
-      throw ApiException(_msg(body) ?? 'فشل إكمال التنصيب', statusCode: res.statusCode);
-    }
   }
 
   Future<void> completeAmountReception({
     required String taskId,
     required double amountReceived,
     String? note,
+    String? imagePath,
   }) async {
-    final headers = await _auth.authHeaders();
-    final res = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/EmployeeTasks/$taskId/complete-amount-reception'),
-      headers: headers,
-      body: jsonEncode({
-        'amountReceived': amountReceived,
-        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-      }),
+    final json = <String, dynamic>{
+      'amountReceived': amountReceived,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    };
+    final fields = <String, String>{
+      'amountReceived': amountReceived.toString(),
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    };
+    await _postComplete(
+      '/EmployeeTasks/$taskId/complete-amount-reception',
+      jsonBody: json,
+      formFields: fields,
+      imagePath: imagePath,
+      errorFallback: 'فشل إكمال استلام المبلغ',
     );
+  }
+
+  Future<void> _postComplete(
+    String path, {
+    required Map<String, dynamic> jsonBody,
+    required Map<String, String> formFields,
+    String? imagePath,
+    required String errorFallback,
+  }) async {
+    final tokenHeaders = await _auth.authHeaders();
+    final authOnly = Map<String, String>.from(tokenHeaders)..remove('Content-Type');
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+
+    late http.Response res;
+    if (imagePath == null || imagePath.isEmpty) {
+      res = await http.post(
+        uri,
+        headers: tokenHeaders,
+        body: jsonEncode(jsonBody),
+      );
+    } else {
+      final req = http.MultipartRequest('POST', uri);
+      req.headers.addAll(authOnly);
+      req.fields.addAll(formFields);
+      req.files.add(await http.MultipartFile.fromPath('image', imagePath));
+      final streamed = await req.send();
+      res = await http.Response.fromStream(streamed);
+    }
+
     if (res.statusCode != 200) {
       final body = _decode(res.body);
-      throw ApiException(_msg(body) ?? 'فشل إكمال استلام المبلغ', statusCode: res.statusCode);
+      throw ApiException(_msg(body) ?? errorFallback, statusCode: res.statusCode);
     }
   }
 

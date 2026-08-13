@@ -34,9 +34,8 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
     isActive: subscriber.isActive,
     activationDate: subscriber.activationDate,
     expirationDate: subscriber.expirationDate || subscriber.activationDate,
-    fat: subscriber.fat ?? '',
-    apartmentNumber: subscriber.apartmentNumber ?? '',
-    zone: subscriber.zone ?? ''
+    address: subscriber.address ?? '',
+    locationCoordinates: subscriber.locationCoordinates ?? ''
   });
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -58,9 +57,8 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
         isActive: subscriber.isActive,
         activationDate: subscriber.activationDate,
         expirationDate: subscriber.expirationDate || subscriber.activationDate,
-        fat: subscriber.fat ?? '',
-        apartmentNumber: subscriber.apartmentNumber ?? '',
-        zone: subscriber.zone ?? ''
+        address: subscriber.address ?? '',
+        locationCoordinates: subscriber.locationCoordinates ?? ''
       });
     }
   }, [isOpen, subscriber, profiles]);
@@ -242,48 +240,34 @@ const EditSubscriberModal: React.FC<EditSubscriberModalProps> = ({
               </div>
             </div>
 
-            {/* رقم البناية */}
+            {/* العنوان */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                رقم البناية
+                العنوان
               </label>
               <input
                 type="text"
-                name="fat"
-                value={formData.fat ?? ''}
+                name="address"
+                value={formData.address ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                placeholder="رقم البناية (اختياري)"
+                placeholder="العنوان (اختياري)"
               />
             </div>
 
-            {/* رقم الشقة */}
+            {/* إحداثيات الموقع */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                رقم الشقة
+                إحداثيات الموقع
               </label>
               <input
                 type="text"
-                name="apartmentNumber"
-                value={formData.apartmentNumber ?? ''}
+                name="locationCoordinates"
+                value={formData.locationCoordinates ?? ''}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                placeholder="مثل: 12B (اختياري)"
-              />
-            </div>
-
-            {/* المنطقة */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                المنطقة
-              </label>
-              <input
-                type="text"
-                name="zone"
-                value={formData.zone ?? ''}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                placeholder="المنطقة (اختياري)"
+                placeholder="مثل: 33.3179117,44.3253275 (اختياري)"
+                dir="ltr"
               />
             </div>
 

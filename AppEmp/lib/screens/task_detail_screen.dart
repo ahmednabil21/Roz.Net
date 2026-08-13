@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/auth_service.dart';
@@ -84,84 +88,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Future<void> _completeMaintenance() async {
-    final ctrl = TextEditingController();
-    final note = await showDialog<String>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('إكمال الصيانة'),
-          content: TextField(
-            controller: ctrl,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: 'ملاحظات التنفيذ (إلزامي)',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-              child: const Text('إكمال'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showCompleteDialog(
+      title: 'إكمال الصيانة',
+      requireNote: true,
+      noteHint: 'ملاحظات التنفيذ (إلزامي)',
     );
-    if (note == null) return;
+    if (result == null) return;
     if (!mounted) return;
-    if (note.isEmpty) {
+    if (result.note.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('الملاحظة مطلوبة')),
       );
       return;
     }
-    await _run(() => _tasks.completeMaintenance(_task.id, note), ok: 'تم إكمال الصيانة');
+    await _run(
+      () => _tasks.completeMaintenance(_task.id, result.note, imagePath: result.imagePath),
+      ok: 'تم إكمال الصيانة',
+    );
   }
 
   Future<void> _completeWithAmount({required bool installation}) async {
-    final amountCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text(installation ? 'إكمال التنصيب' : 'إكمال استلام المبلغ'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'المبلغ المستلم',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtrl,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'ملاحظة (اختياري)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('إكمال')),
-          ],
-        ),
-      ),
+    final result = await _showCompleteDialog(
+      title: installation ? 'إكمال التنصيب' : 'إكمال استلام المبلغ',
+      requireAmount: true,
     );
-    if (ok != true) return;
+    if (result == null) return;
     if (!mounted) return;
-    final amount = double.tryParse(amountCtrl.text.trim());
-    if (amount == null) {
+    if (result.amount == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('أدخل مبلغاً صالحاً')),
       );
@@ -171,16 +124,120 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       () => installation
           ? _tasks.completeInstallation(
               taskId: _task.id,
-              amountReceived: amount,
-              note: noteCtrl.text,
+              amountReceived: result.amount!,
+              note: result.note,
+              imagePath: result.imagePath,
             )
           : _tasks.completeAmountReception(
               taskId: _task.id,
-              amountReceived: amount,
-              note: noteCtrl.text,
+              amountReceived: result.amount!,
+              note: result.note,
+              imagePath: result.imagePath,
             ),
       ok: 'تم الإكمال',
     );
+  }
+
+  Future<({String note, double? amount, String? imagePath})?> _showCompleteDialog({
+    required String title,
+    bool requireNote = false,
+    bool requireAmount = false,
+    String noteHint = 'ملاحظة (اختياري)',
+  }) {
+    final noteCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    String? imagePath;
+
+    return showDialog<({String note, double? amount, String? imagePath})>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: Text(title),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (requireAmount) ...[
+                      TextField(
+                        controller: amountCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'المبلغ المستلم',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: requireNote ? 4 : 2,
+                      decoration: InputDecoration(
+                        hintText: noteHint,
+                        labelText: requireNote ? null : noteHint,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (imagePath != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(File(imagePath!), height: 140, fit: BoxFit.cover),
+                      ),
+                      TextButton(
+                        onPressed: () => setLocal(() => imagePath = null),
+                        child: const Text('إزالة الصورة'),
+                      ),
+                    ],
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picker = ImagePicker();
+                        final file = await picker.pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 80,
+                          maxWidth: 1600,
+                        );
+                        if (file != null) setLocal(() => imagePath = file.path);
+                      },
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('التقاط صورة (اختياري)'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx, (
+                      note: noteCtrl.text.trim(),
+                      amount: requireAmount ? double.tryParse(amountCtrl.text.trim()) : null,
+                      imagePath: imagePath,
+                    ));
+                  },
+                  child: const Text('إكمال'),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openMaps() async {
+    final coords = _task.displayCoordinates;
+    if (coords == null || coords.isEmpty) return;
+    final cleaned = coords.replaceAll(' ', '');
+    final uri = Uri.parse('https://www.google.com/maps?q=$cleaned');
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر فتح خرائط Google')),
+      );
+    }
   }
 
   Widget _row(String label, String? value) {
@@ -247,10 +304,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   const Divider(height: 24),
                   _row('النوع', _task.taskTypeLabel),
                   if (_task.isMaintenance) _row('نوع الصيانة', _task.maintenanceTypeLabel),
-                  _row('المشترك', _task.subscriberDisplayName),
-                  _row('اسم للتنصيب', _task.newSubscriberName),
+                  _row('اسم المشترك', _task.displaySubscriberName),
+                  _row('العنوان', _task.displayAddress),
+                  _row('الإحداثيات', _task.displayCoordinates),
                   _row('هاتف', _task.newSubscriberPhone),
-                  _row('العنوان', _task.newSubscriberAddress),
                   _row('ملاحظة', _task.note),
                   _row('التفاصيل', _task.taskDetails),
                   _row('أنشأها', _task.createdByUserName),
@@ -260,6 +317,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ],
               ),
             ),
+            if (_task.displayCoordinates != null) ...[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _openMaps,
+                icon: const Icon(Icons.location_on),
+                label: const Text('اذهب الى الموقع'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF1A73E8),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             if (_busy)
               const Center(child: CircularProgressIndicator(color: Color(0xFF2962FF)))
@@ -292,7 +362,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   FilledButton.icon(
                     onPressed: _completeMaintenance,
                     icon: const Icon(Icons.done_all),
-                    label: const Text('إكمال الصيانة'),
+                    label: const Text('إكمال المهمة'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -303,7 +373,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   FilledButton.icon(
                     onPressed: () => _completeWithAmount(installation: true),
                     icon: const Icon(Icons.done_all),
-                    label: const Text('إكمال التنصيب'),
+                    label: const Text('إكمال المهمة'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -314,7 +384,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   FilledButton.icon(
                     onPressed: () => _completeWithAmount(installation: false),
                     icon: const Icon(Icons.done_all),
-                    label: const Text('إكمال استلام المبلغ'),
+                    label: const Text('إكمال المهمة'),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       padding: const EdgeInsets.symmetric(vertical: 14),

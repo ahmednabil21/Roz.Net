@@ -177,8 +177,10 @@ const DebtsPage: React.FC = () => {
   });
   const [paymentData, setPaymentData] = useState<DebtPaymentRequest>({
     paymentAmount: 0,
-    notes: ''
+    notes: '',
+    discountAmount: 0,
   });
+  const [paymentDiscountEnabled, setPaymentDiscountEnabled] = useState(false);
 
   const queryClient = useQueryClient();
   // Close dropdown when clicking outside
@@ -207,6 +209,18 @@ const DebtsPage: React.FC = () => {
 
   const toggleSelectOne = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const openPayModal = (debt: Debt, fromSubscriberDebts = false) => {
+    setSelectedDebt(debt);
+    setPaymentDiscountEnabled(false);
+    setPaymentData({
+      paymentAmount: debt.amount,
+      notes: '',
+      discountAmount: 0,
+    });
+    if (fromSubscriberDebts) setOpenedFromSubscriberDebts(true);
+    setShowPayDebtModal(true);
   };
 
   const handleSendDebtAlertMessage = async () => {
@@ -934,12 +948,7 @@ const DebtsPage: React.FC = () => {
                             if (subscriberDebt && subscriberDebt.unpaidDebt > 0) {
                               const unpaidDebt = subscriberDebt.debts.find((d: any) => !d.isPaid);
                               if (unpaidDebt) {
-                                setSelectedDebt(unpaidDebt);
-                                setPaymentData({
-                                  paymentAmount: unpaidDebt.amount,
-                                  notes: ''
-                                });
-                                setShowPayDebtModal(true);
+                                openPayModal(unpaidDebt);
                               }
                             }
                           }
@@ -1223,9 +1232,7 @@ const DebtsPage: React.FC = () => {
                             if (subscriberDebt.unpaidDebt > 0) {
                               const unpaidDebt = subscriberDebt.debts.find((d: any) => d.status === 0 || !d.isPaid);
                               if (unpaidDebt) {
-                                setSelectedDebt(unpaidDebt);
-                                setPaymentData({ paymentAmount: unpaidDebt.amount, notes: '' });
-                                setShowPayDebtModal(true);
+                                openPayModal(unpaidDebt);
                               }
                             }
                           }}
@@ -1665,7 +1672,24 @@ const DebtsPage: React.FC = () => {
 
             <form onSubmit={(e) => {
               e.preventDefault();
-              payDebtMutation.mutate({ id: selectedDebt.id, paymentData });
+              const payment = Number(paymentData.paymentAmount) || 0;
+              const discount = paymentDiscountEnabled ? Number(paymentData.discountAmount) || 0 : 0;
+              if (payment + discount <= 0) {
+                showError('خطأ', 'أدخل مبلغ دفع أو خصم أكبر من صفر.');
+                return;
+              }
+              if (payment + discount > selectedDebt.amount) {
+                showError('خطأ', 'مجموع الدفع والخصم أكبر من مبلغ الدين.');
+                return;
+              }
+              payDebtMutation.mutate({
+                id: selectedDebt.id,
+                paymentData: {
+                  paymentAmount: payment,
+                  notes: paymentData.notes,
+                  ...(discount > 0 ? { discountAmount: discount } : {}),
+                },
+              });
             }} className="p-6 space-y-4">
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
@@ -1711,6 +1735,91 @@ const DebtsPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
                   placeholder="مبلغ الدفع"
                 />
+              </div>
+
+              <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/80 dark:bg-green-950/30 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">تطبيق خصم</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      يُخصم من الدين مع مبلغ الدفع
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={paymentDiscountEnabled}
+                    aria-label="تطبيق خصم"
+                    onClick={() => {
+                      const next = !paymentDiscountEnabled;
+                      setPaymentDiscountEnabled(next);
+                      if (!next) setPaymentData((prev) => ({ ...prev, discountAmount: 0 }));
+                    }}
+                    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                      paymentDiscountEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        paymentDiscountEnabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {paymentDiscountEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      مبلغ الخصم (د.ع)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={selectedDebt.amount}
+                      value={paymentData.discountAmount ?? 0}
+                      onChange={(e) =>
+                        setPaymentData((prev) => ({ ...prev, discountAmount: Number(e.target.value) }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                )}
+                <div className="space-y-1 pt-1 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-600 dark:text-gray-400">مبلغ الدين:</span>
+                    <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                      {formatNumber(selectedDebt.amount, { suffix: ' د.ع' })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-600 dark:text-gray-400">الدفع:</span>
+                    <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+                      {formatNumber(Number(paymentData.paymentAmount) || 0, { suffix: ' د.ع' })}
+                    </span>
+                  </div>
+                  {paymentDiscountEnabled && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-600 dark:text-gray-400">الخصم:</span>
+                      <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
+                        − {formatNumber(Number(paymentData.discountAmount) || 0, { suffix: ' د.ع' })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-green-200 dark:border-green-800">
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">المتبقي:</span>
+                    <span className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                      {formatNumber(
+                        Math.max(
+                          0,
+                          selectedDebt.amount -
+                            (Number(paymentData.paymentAmount) || 0) -
+                            (paymentDiscountEnabled ? Number(paymentData.discountAmount) || 0 : 0)
+                        ),
+                        { suffix: ' د.ع' }
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -2275,10 +2384,7 @@ const DebtsPage: React.FC = () => {
                                 {!debt.isPaid && (
                                   <button
                                     onClick={() => {
-                                      setSelectedDebt(debt);
-                                      setPaymentData({ paymentAmount: debt.amount, notes: '' });
-                                      setOpenedFromSubscriberDebts(true);
-                                      setShowPayDebtModal(true);
+                                      openPayModal(debt, true);
                                       setShowSubscriberDebtsModal(false);
                                     }}
                                     className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 flex items-center space-x-1"

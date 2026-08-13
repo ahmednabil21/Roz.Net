@@ -2046,9 +2046,8 @@ class ApiService {
       if (params?.maxDaysUntilExpiry !== undefined && params.maxDaysUntilExpiry >= 0) {
         cleanParams.maxDaysUntilExpiry = params.maxDaysUntilExpiry;
       }
-      if (params?.fat?.trim()) cleanParams.fat = params.fat.trim();
-      if (params?.apartmentNumber?.trim()) cleanParams.apartmentNumber = params.apartmentNumber.trim();
-      if (params?.zone?.trim()) cleanParams.zone = params.zone.trim();
+      if (params?.address?.trim()) cleanParams.address = params.address.trim();
+      if (params?.locationCoordinates?.trim()) cleanParams.locationCoordinates = params.locationCoordinates.trim();
       const profileIds = (params?.profileIds ?? []).map((id) => id.trim()).filter(Boolean);
       if (profileIds.length > 0) {
         cleanParams.profileIds = profileIds;
@@ -2729,8 +2728,8 @@ class ApiService {
     if (params?.sortDescending !== undefined) queryParams.sortDescending = params.sortDescending;
     if (params?.status !== undefined && params?.status !== null) queryParams.DebtStatus = params.status;
     if (params?.maxDaysUntilExpiry !== undefined && params.maxDaysUntilExpiry >= 0) queryParams.maxDaysUntilExpiry = params.maxDaysUntilExpiry;
-    if (params?.fat?.trim()) queryParams.fat = params.fat.trim();
-    if (params?.zone?.trim()) queryParams.zone = params.zone.trim();
+    if (params?.address?.trim()) queryParams.address = params.address.trim();
+    if (params?.locationCoordinates?.trim()) queryParams.locationCoordinates = params.locationCoordinates.trim();
     if (params?.noteType !== undefined && params.noteType !== null) queryParams.noteType = params.noteType;
     if (params?.paymentCreatedAtFrom?.trim()) queryParams.paymentCreatedAtFrom = params.paymentCreatedAtFrom.trim();
     if (params?.paymentCreatedAtTo?.trim()) queryParams.paymentCreatedAtTo = params.paymentCreatedAtTo.trim();

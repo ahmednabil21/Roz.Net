@@ -115,6 +115,7 @@ const EmployeeTasksPage: React.FC = () => {
     newSubscriberName: '',
     newSubscriberPhone: '',
     newSubscriberAddress: '',
+    newSubscriberCoordinates: '',
   });
   const [completeForm, setCompleteForm] = useState<EmployeeTaskCompleteInstallationRequest>({
     subscriberName: '',
@@ -487,6 +488,7 @@ const EmployeeTasksPage: React.FC = () => {
         newSubscriberName: '',
         newSubscriberPhone: '',
         newSubscriberAddress: '',
+        newSubscriberCoordinates: '',
       });
       setAmountReceptionSubscriberIds([]);
       queryClient.invalidateQueries({ queryKey: ['employee-tasks'] });
@@ -506,9 +508,11 @@ const EmployeeTasksPage: React.FC = () => {
       const name = payload.newSubscriberName?.trim();
       const phone = payload.newSubscriberPhone?.trim();
       const address = payload.newSubscriberAddress?.trim();
+      const coords = payload.newSubscriberCoordinates?.trim();
       if (name) trimmed.newSubscriberName = name;
       if (phone) trimmed.newSubscriberPhone = phone;
       if (address) trimmed.newSubscriberAddress = address;
+      if (coords) trimmed.newSubscriberCoordinates = coords;
       return trimmed;
     }
     if (payload.taskType === EmployeeTaskType.SubscriberMaintenance) {
@@ -660,6 +664,7 @@ const EmployeeTasksPage: React.FC = () => {
       trimmed.newSubscriberName = payload.newSubscriberName?.trim() || undefined;
       trimmed.newSubscriberPhone = payload.newSubscriberPhone?.trim() || undefined;
       trimmed.newSubscriberAddress = payload.newSubscriberAddress?.trim() || undefined;
+      trimmed.newSubscriberCoordinates = payload.newSubscriberCoordinates?.trim() || undefined;
       return trimmed;
     }
 
@@ -750,6 +755,7 @@ const EmployeeTasksPage: React.FC = () => {
                 newSubscriberName: '',
                 newSubscriberPhone: '',
                 newSubscriberAddress: '',
+                newSubscriberCoordinates: '',
               });
               setAmountReceptionSubscriberIds([]);
             }}
@@ -1041,6 +1047,7 @@ const EmployeeTasksPage: React.FC = () => {
                                     newSubscriberName: task.newSubscriberName || '',
                                     newSubscriberPhone: task.newSubscriberPhone || '',
                                     newSubscriberAddress: task.newSubscriberAddress || '',
+                                    newSubscriberCoordinates: task.newSubscriberCoordinates || '',
                                   });
                                   setAmountReceptionSubscriberIds(task.subscriberId ? [task.subscriberId] : []);
                                   setShowEditModal(true);
@@ -1236,6 +1243,7 @@ const EmployeeTasksPage: React.FC = () => {
                     newSubscriberName: '',
                     newSubscriberPhone: '',
                     newSubscriberAddress: '',
+                    newSubscriberCoordinates: '',
                   }));
                 }}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
@@ -1267,6 +1275,14 @@ const EmployeeTasksPage: React.FC = () => {
                     value={createForm.newSubscriberAddress ?? ''}
                     onChange={(e) => setCreateForm((p) => ({ ...p, newSubscriberAddress: e.target.value }))}
                     placeholder="عنوان المشترك الجديد *"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                  />
+                  <input
+                    type="text"
+                    value={createForm.newSubscriberCoordinates ?? ''}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, newSubscriberCoordinates: e.target.value }))}
+                    placeholder="إحداثيات الموقع (اختياري) مثل 33.3179117,44.3253275"
+                    dir="ltr"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -1768,21 +1784,27 @@ const EmployeeTasksPage: React.FC = () => {
                     '—'}
                 </p>
               </div>
+              <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                <p className="text-gray-500 dark:text-gray-400">العنوان</p>
+                <p className="text-gray-900 dark:text-white mt-1">
+                  {selectedTask.newSubscriberAddress || selectedTask.subscriberAddress || '—'}
+                </p>
+              </div>
+              {(selectedTask.newSubscriberCoordinates || selectedTask.subscriberLocationCoordinates) && (
+                <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                  <p className="text-gray-500 dark:text-gray-400">الإحداثيات</p>
+                  <p className="text-gray-900 dark:text-white mt-1" dir="ltr">
+                    {selectedTask.newSubscriberCoordinates || selectedTask.subscriberLocationCoordinates}
+                  </p>
+                </div>
+              )}
               {selectedTask.taskType === EmployeeTaskType.SubscriberInstallation && (
-                <>
-                  <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
-                    <p className="text-gray-500 dark:text-gray-400">هاتف المشترك الجديد</p>
-                    <p className="text-gray-900 dark:text-white mt-1">
-                      {selectedTask.newSubscriberPhone || '—'}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
-                    <p className="text-gray-500 dark:text-gray-400">عنوان المشترك الجديد</p>
-                    <p className="text-gray-900 dark:text-white mt-1">
-                      {selectedTask.newSubscriberAddress || '—'}
-                    </p>
-                  </div>
-                </>
+                <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                  <p className="text-gray-500 dark:text-gray-400">هاتف المشترك الجديد</p>
+                  <p className="text-gray-900 dark:text-white mt-1">
+                    {selectedTask.newSubscriberPhone || '—'}
+                  </p>
+                </div>
               )}
               <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
                 <p className="text-gray-500 dark:text-gray-400">ملاحظة المهمة</p>

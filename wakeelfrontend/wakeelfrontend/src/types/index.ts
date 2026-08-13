@@ -1385,6 +1385,10 @@ export interface EmployeeTask {
   newSubscriberName?: string | null;
   newSubscriberPhone?: string | null;
   newSubscriberAddress?: string | null;
+  newSubscriberCoordinates?: string | null;
+  subscriberAddress?: string | null;
+  subscriberLocationCoordinates?: string | null;
+  completionImageUrl?: string | null;
   maintenanceType?: SubscriberMaintenanceKind | null;
   amountReceived?: number | null;
   materialId?: string | null;
@@ -1424,6 +1428,7 @@ export interface EmployeeTaskCreateRequest {
   newSubscriberName?: string;
   newSubscriberPhone?: string;
   newSubscriberAddress?: string;
+  newSubscriberCoordinates?: string;
 }
 
 /** استجابة POST /EmployeeTasks عند إرسال subscriberIds */
@@ -1444,6 +1449,7 @@ export interface EmployeeTaskUpdateRequest {
   newSubscriberName?: string;
   newSubscriberPhone?: string;
   newSubscriberAddress?: string;
+  newSubscriberCoordinates?: string;
 }
 
 export interface EmployeeTaskCompleteInstallationRequest {
@@ -1917,12 +1923,10 @@ export interface Subscriber {
   regionId?: string | null;
   regionName?: string | null;
   totalDebt?: number;
-  /** رقم البناية (اختياري، حد أقصى 200 حرف) — الحقل API: fat */
-  fat?: string | null;
-  /** رقم الشقة (اختياري) */
-  apartmentNumber?: string | null;
-  /** المنطقة (اختياري، حد أقصى 200 حرف) */
-  zone?: string | null;
+  /** العنوان (اختياري، حد أقصى 500 حرف) */
+  address?: string | null;
+  /** إحداثيات الموقع (اختياري، مثل: 33.3179117,44.3253275) */
+  locationCoordinates?: string | null;
   /** صيانات مكتملة مرتبطة بالمشترك (من مهام الموظفين)، من الأحدث للأقدم */
   maintenanceRecords?: SubscriberMaintenanceRecordDto[];
   /** ملخص إرسالات واتساب وسجل محاولات (يُملأ من تفاصيل المشترك بالمعرّف) */
@@ -1945,12 +1949,10 @@ export interface SubscriberCreateRequest {
   activationDate: string;
   expirationDate: string;
   subscriptionType: SubscriptionType;
-  /** رقم البناية (اختياري) — الحقل API: fat */
-  fat?: string;
-  /** رقم الشقة (اختياري) */
-  apartmentNumber?: string;
-  /** المنطقة (اختياري، حد أقصى 200 حرف) */
-  zone?: string;
+  /** العنوان (اختياري) */
+  address?: string;
+  /** إحداثيات الموقع (اختياري) */
+  locationCoordinates?: string;
   /** الرسيلر/المنطقة الحالية للمشترك */
   agentResellerId?: string;
 }
@@ -1971,9 +1973,8 @@ export interface SubscriberUpdateRequest {
   activationDate: string;
   expirationDate: string;
   subscriptionType?: SubscriptionType;
-  fat?: string;
-  apartmentNumber?: string;
-  zone?: string;
+  address?: string;
+  locationCoordinates?: string;
 }
 
 // Dashboard Stats (قديم — يُستخدم كـ fallback إن لزم)
@@ -2495,6 +2496,7 @@ export interface DebtUpdateRequest {
 export interface DebtPaymentRequest {
   paymentAmount: number;
   notes?: string;
+  discountAmount?: number;
 }
 
 // GET /Debts/subscriber/{subscriberId}/total يرجّع رقم فقط
@@ -2661,12 +2663,10 @@ export interface PaginationParams {
   sortDescending?: boolean;
   /** المشتركون الذين سينتهي اشتراكهم خلال 0..N يوم (يشمل المنتهي، 0 يوم) */
   maxDaysUntilExpiry?: number;
-  /** فلترة بالمطابقة الجزئية على رقم البناية (fat) */
-  fat?: string;
-  /** فلترة بالمطابقة الجزئية على رقم الشقة */
-  apartmentNumber?: string;
-  /** فلترة بالمطابقة الجزئية على الزون */
-  zone?: string;
+  /** فلترة بالمطابقة الجزئية على العنوان */
+  address?: string;
+  /** فلترة بالمطابقة الجزئية على إحداثيات الموقع */
+  locationCoordinates?: string;
   /** فلترة بباقة واحدة */
   profileId?: string;
   /** فلترة بعدة باقات — يُفضَّل على profileId عند وجوده */
@@ -2692,8 +2692,8 @@ export interface DebtsListParams extends Omit<PaginationParams, 'status'> {
   /** حالة الدين (DebtStatus) — يرسل كـ DebtStatus في الباكند */
   status?: DebtStatus;
   maxDaysUntilExpiry?: number;
-  fat?: string;
-  zone?: string;
+  address?: string;
+  locationCoordinates?: string;
   noteType?: SubscriberNoteType;
   /** وصف الدين (مطابقة جزئية) — يرسل كـ DebtDescription */
   debtDescription?: string;

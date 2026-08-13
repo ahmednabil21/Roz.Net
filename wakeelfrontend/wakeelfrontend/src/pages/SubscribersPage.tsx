@@ -62,9 +62,8 @@ const SUBSCRIBERS_TABLE_COLUMNS: { id: string; label: string }[] = [
   { id: 'subscriberRegion', label: 'منطقة المشترك' },
   { id: 'phoneNumber', label: 'رقم الهاتف' },
   { id: 'agentCompanyName', label: 'شركة الوكيل' },
-  { id: 'fat', label: 'رقم البناية' },
-  { id: 'apartmentNumber', label: 'رقم الشقة' },
-  { id: 'zone', label: 'المنطقة' },
+  { id: 'address', label: 'العنوان' },
+  { id: 'locationCoordinates', label: 'إحداثيات الموقع' },
   { id: 'noteType', label: 'نوع الملاحظة' },
   { id: 'note', label: 'الملاحظات' },
   { id: 'profile', label: 'الباقة' },
@@ -222,7 +221,7 @@ function resolveFtthCompareLocalPackagePrice(
 function buildSyntheticSubscriberFromFtthRow(
   row: FtthSubscriptionsCompareItem,
   resellerId: string,
-  zone?: string | null,
+  address?: string | null,
   periods?: FtthSyncPeriodDraft[],
 ): Subscriber {
   const { firstName, lastName } = splitFtthCustomerName(resolveFtthCompareCustomerName(row) || row.username || '');
@@ -248,7 +247,7 @@ function buildSyntheticSubscriberFromFtthRow(
     profilePrice: 0,
     agentCompanyName: '',
     agentResellerId: resellerId,
-    zone: zone ?? undefined,
+    address: address ?? undefined,
   };
 }
 
@@ -499,13 +498,11 @@ const SubscribersPage: React.FC = () => {
   const [sortDescending, setSortDescending] = useState<boolean>(true);
   const [maxDaysUntilExpiry, setMaxDaysUntilExpiry] = useState<string>('');
   const [appliedMaxDaysUntilExpiry, setAppliedMaxDaysUntilExpiry] = useState<string>('');
-  const [fatFilter, setFatFilter] = useState<string>('');
-  const [apartmentNumberFilter, setApartmentNumberFilter] = useState<string>('');
-  const [zoneFilter, setZoneFilter] = useState<string>('');
+  const [addressFilter, setAddressFilter] = useState<string>('');
+  const [locationCoordinatesFilter, setLocationCoordinatesFilter] = useState<string>('');
   const [profileIdsFilter, setProfileIdsFilter] = useState<string[]>([]);
-  const [appliedFatFilter, setAppliedFatFilter] = useState<string>('');
-  const [appliedApartmentNumberFilter, setAppliedApartmentNumberFilter] = useState<string>('');
-  const [appliedZoneFilter, setAppliedZoneFilter] = useState<string>('');
+  const [appliedAddressFilter, setAppliedAddressFilter] = useState<string>('');
+  const [appliedLocationCoordinatesFilter, setAppliedLocationCoordinatesFilter] = useState<string>('');
   const [appliedProfileIdsFilter, setAppliedProfileIdsFilter] = useState<string[]>([]);
   const [noteTypeFilter, setNoteTypeFilter] = useState<string>('all');
   const [appliedNoteTypeFilter, setAppliedNoteTypeFilter] = useState<string>('all');
@@ -661,9 +658,8 @@ const SubscribersPage: React.FC = () => {
     activationDate: new Date().toISOString().split('T')[0],
     expirationDate: new Date().toISOString().split('T')[0],
     subscriptionType: SubscriptionType.Paid,
-    fat: '',
-    apartmentNumber: '',
-    zone: '',
+    address: '',
+    locationCoordinates: '',
     agentResellerId: ''
   });
 
@@ -702,7 +698,7 @@ const SubscribersPage: React.FC = () => {
   };
 
   const { data: subscribersResponse, error, isLoading } = useQuery<PaginatedResponse<Subscriber>>({
-    queryKey: ['subscribers', 'offline', online, currentPage, pageSize, debouncedSearchTerm, statusFilter, sortDescending, appliedMaxDaysUntilExpiry, appliedFatFilter, appliedApartmentNumberFilter, appliedZoneFilter, appliedProfileIdsFilter, appliedNoteTypeFilter, appliedExtensionActivationFilter, appliedExpirationFromDate, appliedExpirationToDate, selectedOperationalRegionId, selectedOperationalResellerId],
+    queryKey: ['subscribers', 'offline', online, currentPage, pageSize, debouncedSearchTerm, statusFilter, sortDescending, appliedMaxDaysUntilExpiry, appliedAddressFilter, appliedLocationCoordinatesFilter, appliedProfileIdsFilter, appliedNoteTypeFilter, appliedExtensionActivationFilter, appliedExpirationFromDate, appliedExpirationToDate, selectedOperationalRegionId, selectedOperationalResellerId],
     queryFn: async () => {
       const daysNum = appliedMaxDaysUntilExpiry.trim() === '' ? undefined : parseInt(appliedMaxDaysUntilExpiry, 10);
       const noteTypeNum =
@@ -724,9 +720,8 @@ const SubscribersPage: React.FC = () => {
         status: statusFilter !== 'all' ? statusFilter.toString() : undefined,
         sortDescending: sortDescending,
         maxDaysUntilExpiry: daysNum !== undefined && !isNaN(daysNum) && daysNum >= 0 ? daysNum : undefined,
-        fat: appliedFatFilter.trim() || undefined,
-        apartmentNumber: appliedApartmentNumberFilter.trim() || undefined,
-        zone: appliedZoneFilter.trim() || undefined,
+        address: appliedAddressFilter.trim() || undefined,
+        locationCoordinates: appliedLocationCoordinatesFilter.trim() || undefined,
         profileIds: appliedProfileIdsFilter.length > 0 ? appliedProfileIdsFilter : undefined,
         noteType: noteTypeNum !== undefined && !isNaN(noteTypeNum as any) ? noteTypeNum : undefined,
         hasExtensionActivation: appliedExtensionActivationFilter || undefined,
@@ -739,9 +734,8 @@ const SubscribersPage: React.FC = () => {
         ),
       };
       if (params.maxDaysUntilExpiry === undefined) delete params.maxDaysUntilExpiry;
-      if (params.fat === undefined) delete params.fat;
-      if (params.apartmentNumber === undefined) delete params.apartmentNumber;
-      if (params.zone === undefined) delete params.zone;
+      if (params.address === undefined) delete params.address;
+      if (params.locationCoordinates === undefined) delete params.locationCoordinates;
       if (params.profileIds === undefined) delete params.profileIds;
       if (params.noteType === undefined) delete params.noteType;
       if (params.hasExtensionActivation === undefined) delete params.hasExtensionActivation;
@@ -1937,9 +1931,8 @@ const SubscribersPage: React.FC = () => {
         activationDate: new Date().toISOString().split('T')[0],
         expirationDate: new Date().toISOString().split('T')[0],
         subscriptionType: SubscriptionType.Paid,
-        fat: '',
-        apartmentNumber: '',
-        zone: '',
+        address: '',
+        locationCoordinates: '',
         agentResellerId: selectedOperationalResellerId || ''
       });
       showSuccess('تم الإنشاء', 'تم إنشاء المشترك بنجاح');
@@ -2049,7 +2042,7 @@ const SubscribersPage: React.FC = () => {
           activationDate: periods[0]!.renewalDate!,
           expirationDate: periods[periods.length - 1]!.newExpirationDate!,
           subscriptionType: SubscriptionType.Paid,
-          zone: ftthCompareSyncContext.zone ?? undefined,
+          address: ftthCompareSyncContext.zone ?? undefined,
           agentResellerId: ftthCompareSyncContext.resellerId,
         });
         subscriberId = created.id;
@@ -2176,13 +2169,11 @@ const SubscribersPage: React.FC = () => {
     setDebouncedSearchTerm('');
     setMaxDaysUntilExpiry('');
     setAppliedMaxDaysUntilExpiry('');
-    setFatFilter('');
-    setApartmentNumberFilter('');
-    setZoneFilter('');
+    setAddressFilter('');
+    setLocationCoordinatesFilter('');
     setProfileIdsFilter([]);
-    setAppliedFatFilter('');
-    setAppliedApartmentNumberFilter('');
-    setAppliedZoneFilter('');
+    setAppliedAddressFilter('');
+    setAppliedLocationCoordinatesFilter('');
     setAppliedProfileIdsFilter([]);
     setNoteTypeFilter('all');
     setAppliedNoteTypeFilter('all');
@@ -2197,9 +2188,8 @@ const SubscribersPage: React.FC = () => {
 
   const handleApplyAdvancedFilter = () => {
     setAppliedMaxDaysUntilExpiry(maxDaysUntilExpiry.trim());
-    setAppliedFatFilter(fatFilter.trim());
-    setAppliedApartmentNumberFilter(apartmentNumberFilter.trim());
-    setAppliedZoneFilter(zoneFilter.trim());
+    setAppliedAddressFilter(addressFilter.trim());
+    setAppliedLocationCoordinatesFilter(locationCoordinatesFilter.trim());
     setAppliedProfileIdsFilter([...profileIdsFilter]);
     setAppliedNoteTypeFilter(noteTypeFilter);
     setAppliedExtensionActivationFilter(extensionActivationFilter);
@@ -2238,8 +2228,8 @@ const SubscribersPage: React.FC = () => {
   };
 
   const hasActiveAdvancedFilter =
-    appliedMaxDaysUntilExpiry !== '' || appliedFatFilter !== '' || appliedApartmentNumberFilter !== '' ||
-    appliedZoneFilter !== '' || appliedProfileIdsFilter.length > 0 ||
+    appliedMaxDaysUntilExpiry !== '' || appliedAddressFilter !== '' || appliedLocationCoordinatesFilter !== '' ||
+    appliedProfileIdsFilter.length > 0 ||
     appliedNoteTypeFilter !== 'all' || appliedExtensionActivationFilter || statusFilter !== 'all';
 
   const toggleProfileIdFilter = (profileId: string) => {
@@ -2251,9 +2241,8 @@ const SubscribersPage: React.FC = () => {
   useEffect(() => {
     if (showAdvancedFilter) {
       setSearchTerm(debouncedSearchTerm ?? '');
-      setFatFilter(appliedFatFilter);
-      setApartmentNumberFilter(appliedApartmentNumberFilter);
-      setZoneFilter(appliedZoneFilter);
+      setAddressFilter(appliedAddressFilter);
+      setLocationCoordinatesFilter(appliedLocationCoordinatesFilter);
       setProfileIdsFilter([...appliedProfileIdsFilter]);
       setNoteTypeFilter(appliedNoteTypeFilter);
       setExtensionActivationFilter(appliedExtensionActivationFilter);
@@ -3463,9 +3452,8 @@ const SubscribersPage: React.FC = () => {
           activationDate: sub.activationDate,
           expirationDate: sub.expirationDate || sub.activationDate,
           profileId,
-          fat: sub.fat ?? '',
-          apartmentNumber: sub.apartmentNumber ?? '',
-          zone: sub.zone ?? '',
+          address: sub.address ?? '',
+          locationCoordinates: sub.locationCoordinates ?? '',
           noteType,
           note: noteType === SubscriberNoteType.Other ? (noteVal || undefined) : undefined,
         };
@@ -3790,7 +3778,7 @@ const SubscribersPage: React.FC = () => {
       {showAdvancedFilter && (
           <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-              الحالة، رقم البناية، رقم الشقة، المنطقة، الباقات، نوع الملاحظة، ترتيب التاريخ، والأيام حتى الانتهاء.
+              الحالة، العنوان، إحداثيات الموقع، الباقات، نوع الملاحظة، ترتيب التاريخ، والأيام حتى الانتهاء.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               <div>
@@ -3819,36 +3807,26 @@ const SubscribersPage: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">رقم البناية</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">العنوان</label>
                 <input
                   type="text"
-                  placeholder="رقم البناية"
-                  maxLength={200}
-                  value={fatFilter}
-                  onChange={(e) => setFatFilter(e.target.value)}
+                  placeholder="العنوان"
+                  maxLength={500}
+                  value={addressFilter}
+                  onChange={(e) => setAddressFilter(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">رقم الشقة</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">إحداثيات الموقع</label>
                 <input
                   type="text"
-                  placeholder="مثل: 12B"
+                  placeholder="مثل: 33.3179117,44.3253275"
                   maxLength={200}
-                  value={apartmentNumberFilter}
-                  onChange={(e) => setApartmentNumberFilter(e.target.value)}
+                  value={locationCoordinatesFilter}
+                  onChange={(e) => setLocationCoordinatesFilter(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">المنطقة</label>
-                <input
-                  type="text"
-                  placeholder="المنطقة"
-                  maxLength={200}
-                  value={zoneFilter}
-                  onChange={(e) => setZoneFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                  dir="ltr"
                 />
               </div>
               <div>
@@ -4015,14 +3993,11 @@ const SubscribersPage: React.FC = () => {
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('agentCompanyName')}`}>
                   شركة الوكيل
                 </th>
-                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('fat')}`}>
-                  رقم البناية
+                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('address')}`}>
+                  العنوان
                 </th>
-                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('apartmentNumber')}`}>
-                  رقم الشقة
-                </th>
-                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('zone')}`}>
-                  المنطقة
+                <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('locationCoordinates')}`}>
+                  إحداثيات الموقع
                 </th>
                 <th className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${col('noteType')}`}>
                   نوع الملاحظة
@@ -4111,14 +4086,11 @@ const SubscribersPage: React.FC = () => {
                       {subscriber.agentCompanyName || 'غير محدد'}
                     </div>
                   </td>
-                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('fat')}`}>
-                    {subscriber.fat ?? '—'}
+                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('address')}`}>
+                    {subscriber.address ?? '—'}
                   </td>
-                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('apartmentNumber')}`}>
-                    {subscriber.apartmentNumber ?? '—'}
-                  </td>
-                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('zone')}`}>
-                    {subscriber.zone ?? '—'}
+                  <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('locationCoordinates')}`} dir="ltr">
+                    {subscriber.locationCoordinates ?? '—'}
                   </td>
                   <td className={`px-2 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900 dark:text-white ${col('noteType')}`}>
                     {getSubscriberNoteTypeBadge(subscriber.noteType, subscriber.note ?? null)}
@@ -4450,48 +4422,35 @@ const SubscribersPage: React.FC = () => {
                 )}
               </div>
 
-              {/* رقم البناية ورقم الشقة والمنطقة */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* العنوان وإحداثيات الموقع */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    رقم البناية
+                    العنوان
                   </label>
                   <input
                     type="text"
-                    name="fat"
-                    value={formData.fat ?? ''}
+                    name="address"
+                    value={formData.address ?? ''}
                     onChange={handleInputChange}
-                    maxLength={200}
+                    maxLength={500}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="رقم البناية (اختياري)"
+                    placeholder="العنوان (اختياري)"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    رقم الشقة
+                    إحداثيات الموقع
                   </label>
                   <input
                     type="text"
-                    name="apartmentNumber"
-                    value={formData.apartmentNumber ?? ''}
+                    name="locationCoordinates"
+                    value={formData.locationCoordinates ?? ''}
                     onChange={handleInputChange}
                     maxLength={200}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="مثل: 12B (اختياري)"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    المنطقة
-                  </label>
-                  <input
-                    type="text"
-                    name="zone"
-                    value={formData.zone ?? ''}
-                    onChange={handleInputChange}
-                    maxLength={200}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white"
-                    placeholder="المنطقة (اختياري)"
+                    placeholder="مثل: 33.3179117,44.3253275 (اختياري)"
+                    dir="ltr"
                   />
                 </div>
               </div>

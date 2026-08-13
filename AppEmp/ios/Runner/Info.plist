@@ -28,11 +28,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>يلزم التطبيق الكاميرا لالتقاط صورة اختيارية عند إكمال المهمة.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tg</string>
 		<string>telegram</string>
 		<string>https</string>
+		<string>comgooglemaps</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

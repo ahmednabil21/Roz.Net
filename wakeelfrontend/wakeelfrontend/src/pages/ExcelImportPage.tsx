@@ -185,8 +185,8 @@ const ExcelImportPage: React.FC = () => {
   const downloadTemplate = () => {
     // IMPORTANT: backend reads columns by position, not by header name
     const templateData = [
-      ['Username', 'FirstName', 'LastName', 'ActivationDate', 'Expire', 'Profile', 'Password', 'Phone', 'SecruptionId', 'FDT', 'FAT', 'Zone'],
-      ['ahmed123', 'أحمد', 'محمد', '2026-02-10', '2026-03-10', 'العادي', 'password123', '07901234567', '1212', '', '', 'المنطقة الأولى']
+      ['Username', 'FirstName', 'LastName', 'ActivationDate', 'Expire', 'Profile', 'Password', 'Phone', 'SecruptionId', 'Address', 'LocationCoordinates'],
+      ['ahmed123', 'أحمد', 'محمد', '2026-02-10', '2026-03-10', 'العادي', 'password123', '07901234567', '1212', 'بغداد - الكرادة', '33.3179117,44.3253275']
     ];
     const blob = createXlsxBlob(templateData, 'المشتركين');
     const link = document.createElement('a');
@@ -458,9 +458,8 @@ const ExcelImportPage: React.FC = () => {
                 <li>7) Password (مطلوب)</li>
                 <li>8) Phone (اختياري)</li>
                 <li>9) SecruptionId (اختياري)</li>
-                <li>10) FDT (اختياري)</li>
-                <li>11) FAT (اختياري)</li>
-                <li>12) Zone (اسم المنطقة — مطلوب إذا الوكيل لديه مناطق)</li>
+                <li>10) Address (العنوان — اختياري)</li>
+                <li>11) LocationCoordinates (إحداثيات الموقع — اختياري، مثل: 33.3179117,44.3253275)</li>
               </ul>
             </div>
 

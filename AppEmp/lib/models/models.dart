@@ -46,6 +46,10 @@ class EmployeeTask {
   final String? newSubscriberName;
   final String? newSubscriberPhone;
   final String? newSubscriberAddress;
+  final String? newSubscriberCoordinates;
+  final String? subscriberAddress;
+  final String? subscriberLocationCoordinates;
+  final String? completionImageUrl;
   final DateTime? createdAt;
   final DateTime? acceptedAt;
   final DateTime? completedAt;
@@ -68,6 +72,10 @@ class EmployeeTask {
     this.newSubscriberName,
     this.newSubscriberPhone,
     this.newSubscriberAddress,
+    this.newSubscriberCoordinates,
+    this.subscriberAddress,
+    this.subscriberLocationCoordinates,
+    this.completionImageUrl,
     this.createdAt,
     this.acceptedAt,
     this.completedAt,
@@ -92,6 +100,12 @@ class EmployeeTask {
       newSubscriberName: _asString(json['newSubscriberName'] ?? json['NewSubscriberName']),
       newSubscriberPhone: _asString(json['newSubscriberPhone'] ?? json['NewSubscriberPhone']),
       newSubscriberAddress: _asString(json['newSubscriberAddress'] ?? json['NewSubscriberAddress']),
+      newSubscriberCoordinates: _asString(json['newSubscriberCoordinates'] ?? json['NewSubscriberCoordinates']),
+      subscriberAddress: _asString(json['subscriberAddress'] ?? json['SubscriberAddress']),
+      subscriberLocationCoordinates: _asString(
+        json['subscriberLocationCoordinates'] ?? json['SubscriberLocationCoordinates'],
+      ),
+      completionImageUrl: _asString(json['completionImageUrl'] ?? json['CompletionImageUrl']),
       createdAt: _asDate(json['createdAt'] ?? json['CreatedAt']),
       acceptedAt: _asDate(json['acceptedAt'] ?? json['AcceptedAt']),
       completedAt: _asDate(json['completedAt'] ?? json['CompletedAt']),
@@ -169,6 +183,30 @@ class EmployeeTask {
   bool get isMaintenance => taskType == 2;
   bool get isInstallation => taskType == 1;
   bool get isAmountReception => taskType == 4;
+
+  String? get displaySubscriberName {
+    final n = newSubscriberName?.trim();
+    if (n != null && n.isNotEmpty) return n;
+    final d = subscriberDisplayName?.trim();
+    if (d != null && d.isNotEmpty) return d;
+    return null;
+  }
+
+  String? get displayAddress {
+    final a = newSubscriberAddress?.trim();
+    if (a != null && a.isNotEmpty) return a;
+    final s = subscriberAddress?.trim();
+    if (s != null && s.isNotEmpty) return s;
+    return null;
+  }
+
+  String? get displayCoordinates {
+    final c = newSubscriberCoordinates?.trim();
+    if (c != null && c.isNotEmpty) return c;
+    final s = subscriberLocationCoordinates?.trim();
+    if (s != null && s.isNotEmpty) return s;
+    return null;
+  }
 }
 
 class PaginatedTasks {

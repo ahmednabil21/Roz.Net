@@ -331,12 +331,15 @@ export function buildCreateRenewalPayload(renewalData: RenewalData): Record<stri
 /** بناء payload عملية PayDebt لمطابقة الباكند */
 export function buildPayDebtPayload(
   debtId: string,
-  paymentData: { paymentAmount: number; notes?: string }
+  paymentData: { paymentAmount: number; notes?: string; discountAmount?: number }
 ): Record<string, unknown> {
   return {
     debtId,
     paymentAmount: paymentData.paymentAmount,
     notes: paymentData.notes ?? '',
+    ...(paymentData.discountAmount != null && paymentData.discountAmount > 0
+      ? { discountAmount: paymentData.discountAmount }
+      : {}),
   };
 }
 
@@ -360,9 +363,8 @@ function backgroundSyncSubscribersToCache(totalItems: number): void {
 function isUnfilteredSubscribersRequest(params: PaginationParams): boolean {
   if (params.search?.trim()) return false;
   if (params.status !== undefined && params.status !== '') return false;
-  if (params.fat?.trim()) return false;
-  if (params.apartmentNumber?.trim()) return false;
-  if (params.zone?.trim()) return false;
+  if (params.address?.trim()) return false;
+  if (params.locationCoordinates?.trim()) return false;
   if (params.profileId?.trim()) return false;
   if ((params.profileIds ?? []).length > 0) return false;
   if (params.noteType !== undefined && params.noteType !== null) return false;
