@@ -3073,6 +3073,17 @@ class ApiService {
     return this.api.defaults.baseURL || '';
   }
 
+  /** يحول مسار wwwroot مثل /uploads/... إلى رابط عام تحت /wakeel */
+  resolvePublicFileUrl(path?: string | null): string | null {
+    if (!path || !String(path).trim()) return null;
+    const p = String(path).trim();
+    if (/^https?:\/\//i.test(p)) return p;
+    const apiBase = (this.api.defaults.baseURL || '').replace(/\/+$/, '');
+    const origin = apiBase.replace(/\/api$/i, '');
+    const rel = p.startsWith('/') ? p : `/${p}`;
+    return `${origin}${rel}`;
+  }
+
   // دالة مساعدة لعرض رسائل الخطأ المترجمة
   static showError(error: any): string {
     // إذا كان الخطأ يحتوي على رسالة مترجمة، استخدمها

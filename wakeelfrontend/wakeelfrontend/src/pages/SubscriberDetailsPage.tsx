@@ -46,6 +46,7 @@ import { useDigits } from '../contexts/DigitsContext';
 import { useAuth } from '../contexts/AuthContext';
 import Pagination from '../components/Pagination';
 import { hasOperationalWhatsAppSession } from '../utils/operationalFilters';
+import TaskCompletionImage from '../components/TaskCompletionImage';
 
 const RENEWAL_PAGE_SIZE = 10;
 const MAINT_PAGE_SIZE = 10;
@@ -1106,7 +1107,7 @@ const SubscriberDetailsPage: React.FC = () => {
 
           {selectedTask && (
             <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px] flex items-center justify-center p-4">
-              <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+              <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">تفاصيل المهمة</h3>
@@ -1139,6 +1140,7 @@ const SubscriberDetailsPage: React.FC = () => {
                   <TaskInfoBlock label="تفاصيل المهمة" value={selectedTask.taskDetails || '—'} />
                   <TaskInfoBlock label="الملاحظة" value={selectedTask.note || '—'} />
                   <TaskInfoBlock label="ملاحظة الإكمال" value={selectedTask.completedNote || '—'} />
+                  <TaskCompletionImage url={selectedTask.completionImageUrl} />
                 </div>
               </div>
             </div>

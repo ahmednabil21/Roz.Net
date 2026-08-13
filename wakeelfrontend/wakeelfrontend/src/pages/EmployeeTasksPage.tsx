@@ -28,6 +28,7 @@ import { showError, showInfo, showSuccess } from '../utils/notifications';
 import { CheckCircle2, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import notificationSound from '../sounds/universfield-new-notification-022-370046.mp3';
 import { ensureWebPushSubscribed } from '../utils/pushNotifications';
+import TaskCompletionImage from '../components/TaskCompletionImage';
 
 const taskTypeLabel = (type: EmployeeTaskType) => {
   if (type === EmployeeTaskType.SubscriberInstallation) return 'تنصيب مشترك';
@@ -1760,7 +1761,7 @@ const EmployeeTasksPage: React.FC = () => {
 
       {showDetailsModal && selectedTask && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3">
-          <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700">
+          <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] flex flex-col">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 dark:text-white">تفاصيل المهمة</h3>
               <button
@@ -1774,7 +1775,7 @@ const EmployeeTasksPage: React.FC = () => {
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
-            <div className="p-4 grid grid-cols-1 gap-3 text-sm">
+            <div className="p-4 grid grid-cols-1 gap-3 text-sm overflow-y-auto flex-1 min-h-0">
               <div className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
                 <p className="text-gray-500 dark:text-gray-400">اسم المشترك</p>
                 <p className="text-gray-900 dark:text-white mt-1">
@@ -1843,6 +1844,7 @@ const EmployeeTasksPage: React.FC = () => {
                   </div>
                 </>
               )}
+              <TaskCompletionImage url={selectedTask.completionImageUrl} />
             </div>
             <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end">
               <button
